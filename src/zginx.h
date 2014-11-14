@@ -7,6 +7,9 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/resource.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <unistd.h>
 
 #define ZGX_INVALID_FILE -1
 #define ZGX_OK 0
@@ -94,9 +97,37 @@ typedef void (*zgx_event_handler_pt)(zgx_event_t *ev);
 typedef struct zgx_event_s {
 	void			*data;
 	unsigned		accept:1;
-	zgx_event_handler_pt	handler;
+	unsigned		write:1;
+	unsigned		read:1;
+	unsigned		ready:1;
+
+	/* the links of the posted queue */
+    zgx_event_t     *next;
+    zgx_event_t    **prev;
 	
+	zgx_event_handler_pt	handler;
 }zgx_event_t;
 
+typedef struct zgx_queue_s {
+	zgx_queue_t 	*prev;
+	zgx_queue_t		*next;
+}zgx_queue_t;
+
+typedef struct zgx_cycle_s {
+	FILE		*logfp;
+	FILE		*errfp;
+	
+}zgx_cycle_t;
+
+typedef struct zgx_listening_s {
+	int				fd; //listen fd
+	struct sockaddr	*sockaddr;
+	socklen_t		socklen;
+	
+	zgx_connection_handler_pt handler;
+	
+};
+typedef void(*zgx_connection_handler_pt)(zgx_connection_t *c);
 typedef volatitle zgx_event_t	*zgx_posted_accept_events;
 typedef	volatitle zgx_event_t	*zgx_posted_events;
+extern zgx_cycle_t cycle;
