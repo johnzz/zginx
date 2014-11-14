@@ -26,10 +26,55 @@ int make_deamon()
 	
 	return 0;
 }
+
+int init_listening_socket(zgx_listening_s *l)
+{
+	int		rc;
+	
+	l.fd = socket(AF_INET,SOCK_STREAM,0);
+	if (l.fd  < 0) {
+		perror("socket()");
+		return -1;
+	}
+
+	if (fcntl(l.fd,F_SETFL,O_NONBLOCK) < 0 ){
+		perror("fcntl error!");
+		close(l.fd);
+		return -1;
+	}
+
+	l.sa_in.sin_family = AF_INET;
+	l.sin_port = htons(conf.port);
+	if ( (rc=inet_pton(AF_INET,conf.host,(void *)&(l.sa_in.sin_addr))) <0 ){
+		fprintf(stderr, "Illegal address: %s\n", conf.host);
+		close(l.fd);
+		return -1;
+	}
+
+	//setsockopt(l.fd, SOL_SOCKET, SO_REUSEADDR,const void *optval, socklen_t optlen)
+
+	if (bind(l.fd, (struct sockaddr *)&(l.sa_in), sizeof(l.sa_in)) < 0) {
+		fprintf(stderr,"bind error!");
+		close(l.fd);
+		return -1;
+	}
+
+	if (listen(l.fd,1024) < 0) {
+		fprintf(stderr,"listen error!");
+		close(l.fd);
+		return -1;		
+	}
+
+	return 0;
+	
+}
+	
 int main(int argc, char *argv[])
 {
 	char			*conf_path;
 	struct passwd	*pwd;
+	FILE			*pidfd;
+	zgx_listening_s	*listen;
 	uid_t			uid;
 	gid_t			gid;
 	char			c;
@@ -85,10 +130,32 @@ int main(int argc, char *argv[])
 		}
 	}
 	
+	/*daemonize
+	*/
 	if ( (ret = make_deamon()) < 0 ) {
 		fprintf(stderr,"make daemon error!\n");
 		return -1;
 	}
+
+	if (conf.pidfile[0] != '/') {
+		fprintf(stderr,"it's not a abs path!\n");
+	}
+	
+	pidfd = fopen(conf.pidfile,"w");
+	if (!pidfd){
+		fprintf(stderr, "can't open [%s] pid file!\n",conf.pidfile);
+		return -1;
+	}
+
+	fprintf(pidfd,"%d\n",(int)getpid());
+	fclose(pidfd);
+
+	
+	if ( init_listening_socket(listen) < 0) {
+		return -1;
+	}
+
+	
 	
 	
 }

@@ -10,6 +10,9 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
 
 #define ZGX_INVALID_FILE -1
 #define ZGX_OK 0
@@ -114,19 +117,26 @@ typedef struct zgx_queue_s {
 }zgx_queue_t;
 
 typedef struct zgx_cycle_s {
-	FILE		*logfp;
-	FILE		*errfp;
+	zgx_open_file_t	*file;
 	
 }zgx_cycle_t;
 
+typedef struct zgx_open_file_s {
+	char		*name;
+	int			fd;
+}
+
 typedef struct zgx_listening_s {
 	int				fd; //listen fd
-	struct sockaddr	*sockaddr;
+	//struct sockaddr	 sockaddr;
+	struct sockadd_in sa_in;
 	socklen_t		socklen;
+	#ifdef USE_IPV6
+	#endif
 	
 	zgx_connection_handler_pt handler;
-	
 };
+
 typedef void(*zgx_connection_handler_pt)(zgx_connection_t *c);
 typedef volatitle zgx_event_t	*zgx_posted_accept_events;
 typedef	volatitle zgx_event_t	*zgx_posted_events;
