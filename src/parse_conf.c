@@ -78,6 +78,12 @@ int parse_conf(char *conf_file)
 				return -1;
 			}
 		}
+
+		if (!strncmp("llevel",start,((int)end-(int)start)/sizeof(char))) {
+			end++;
+			conf.llevel= atoi(end);
+			fprintf(stdout,"use [%d] level!\n",conf.llevel);
+		}		
 	
 	}
 

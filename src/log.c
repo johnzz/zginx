@@ -1,4 +1,4 @@
 #include "zginx.h"
 
-void zgx_log(int log_level, )
+void zgx_log_err(int log_level, )
 

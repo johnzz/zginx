@@ -28,6 +28,12 @@ typedef enum {
 }zgx_method_t;
 
 typedef enum {
+	ZGX_LOG_DEBUG = 0,
+	ZGX_LOG_ERROR,
+	ZGX_LOG_CRIT,
+}zgx_log_level_t;
+
+typedef enum {
 	HTTP_VERSION_1_0 = 0,
 	HTTP_VSERION_1_1,
 }zgx_version_t;
@@ -92,6 +98,7 @@ typedef struct configure {
 	char				*pidfile;
 	char				*log;
 	char				*error_log;
+	int					llevel;
 	
 }configure_t;
 
@@ -116,15 +123,16 @@ typedef struct zgx_queue_s {
 	zgx_queue_t		*next;
 }zgx_queue_t;
 
-typedef struct zgx_cycle_s {
-	zgx_open_file_t	*file;
-	
-}zgx_cycle_t;
-
 typedef struct zgx_open_file_s {
 	char		*name;
 	int			fd;
-}
+}zgx_open_file_t;
+
+typedef struct zgx_cycle_s {
+	zgx_open_file_t	*file;
+	int			level;
+	
+}zgx_cycle_t;
 
 typedef struct zgx_listening_s {
 	int				fd; //listen fd
@@ -140,4 +148,5 @@ typedef struct zgx_listening_s {
 typedef void(*zgx_connection_handler_pt)(zgx_connection_t *c);
 typedef volatitle zgx_event_t	*zgx_posted_accept_events;
 typedef	volatitle zgx_event_t	*zgx_posted_events;
+typedef void (*zgx_spawn_proc_pt) (void *data);
 extern zgx_cycle_t cycle;

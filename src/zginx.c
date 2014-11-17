@@ -1,6 +1,8 @@
 #include "zginx.h"
 
+#define ZGX_MAX_PROCESS 1024
 zgx_cycle_t cycle;
+
 int make_deamon()
 {
 	pid_t	pid;
@@ -22,10 +24,12 @@ int make_deamon()
 	for (i=0; i<getdtablesize();i++) {
 		close(i);
 	}
+	
 	umask(0);
 	
 	return 0;
 }
+
 
 int init_listening_socket(zgx_listening_s *l)
 {
@@ -68,7 +72,25 @@ int init_listening_socket(zgx_listening_s *l)
 	return 0;
 	
 }
+
+void * zgx_start_worker_process(int i, zgx_spawn_proc_pt process,void *data)
+{
+	int retpid;
 	
+	retpid = fork();
+	switch(retpid) {
+		case -1:
+			zgx_log_error(ZGX_LOG_ALERT, cycle->log, zgx_errno,
+                      "fork() failed while spawning \"%s\"", name);	
+			return -1;
+		case 0:
+			process(data);
+			break;
+		default:
+			break;
+				
+	}
+}
 int main(int argc, char *argv[])
 {
 	char			*conf_path;
@@ -79,6 +101,7 @@ int main(int argc, char *argv[])
 	gid_t			gid;
 	char			c;
 	int				ret;
+	int				i;
 
 	while ((c = getopt(argc,argv,"c:")) != -1 ) {
 		switch (c) {
@@ -150,12 +173,13 @@ int main(int argc, char *argv[])
 	fprintf(pidfd,"%d\n",(int)getpid());
 	fclose(pidfd);
 
-	
 	if ( init_listening_socket(listen) < 0) {
 		return -1;
 	}
-
 	
+	for (i=0;i<conf.process_num,i++) {
+		zgx_start_worker_process(i,zgx_spawn_proc_pt,);
+	}
 	
 	
 }
