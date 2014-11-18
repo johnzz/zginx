@@ -73,14 +73,43 @@ int init_listening_socket(zgx_listening_s *l)
 	
 }
 
-void * zgx_start_worker_process(int i, zgx_spawn_proc_pt process,void *data)
+void zgx_worker_process_init(int worker)
+{
+	cpu_set_t mask;
+	int			i;
+	
+	CPU_ZERO(&mask);
+	i = 0;
+	
+	while ( cpu_num ) {
+		CPU_SET(i, &mask);
+		i++;
+		cpu_num --;
+	}
+
+	if (cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_PID, -1,
+                           sizeof(cpuset_t), &mask) == -1){
+		zgx_log(ERROR,"cpu_setaffinity() failed!");
+	}
+}
+void * zgx_worker_process(void *data)
+{
+	int worker = (int) data;
+	
+	zgx_worker_process_init(worker);
+	setproctitle("%s","work_process");
+	
+	
+}
+
+void * zgx_start_worker_process(void *data, zgx_spawn_proc_pt process)
 {
 	int retpid;
 	
 	retpid = fork();
 	switch(retpid) {
 		case -1:
-			zgx_log_error(ZGX_LOG_ALERT, cycle->log, zgx_errno,
+			zgx_log(ERROR,
                       "fork() failed while spawning \"%s\"", name);	
 			return -1;
 		case 0:
@@ -91,6 +120,14 @@ void * zgx_start_worker_process(int i, zgx_spawn_proc_pt process,void *data)
 				
 	}
 }
+
+void cycle_init()
+{
+	zgx_log_init();
+	cycle.level = conf.llevel;
+	
+}
+
 int main(int argc, char *argv[])
 {
 	char			*conf_path;
@@ -119,10 +156,12 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	cycle_init();
+
 	/* If we're root and we're going to become another user, get the uid/gid
     ** now.
     */
-
+	
 	if (getuid() == 0) {
 		pwd = getpwnam(conf.user);
 		if (!pwd) {
@@ -178,7 +217,7 @@ int main(int argc, char *argv[])
 	}
 	
 	for (i=0;i<conf.process_num,i++) {
-		zgx_start_worker_process(i,zgx_spawn_proc_pt,);
+		zgx_start_worker_process((void *)(int) i, zgx_worker_process);
 	}
 	
 	

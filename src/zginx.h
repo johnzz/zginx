@@ -12,7 +12,9 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-
+#include <stdarg.h>
+#include <sys/time.h>
+#include <sys/cpuset.h>
 
 #define ZGX_INVALID_FILE -1
 #define ZGX_OK 0
@@ -28,9 +30,9 @@ typedef enum {
 }zgx_method_t;
 
 typedef enum {
-	ZGX_LOG_DEBUG = 0,
-	ZGX_LOG_ERROR,
-	ZGX_LOG_CRIT,
+	DEBUG = 0,
+	ERROR,
+	CRIT,
 }zgx_log_level_t;
 
 typedef enum {
