@@ -15,6 +15,10 @@
 #include <stdarg.h>
 #include <sys/time.h>
 #include <sys/cpuset.h>
+#include <unistd.h>
+
+#define _GNU_SOURCE
+#include <sched.h>
 
 #define ZGX_INVALID_FILE -1
 #define ZGX_OK 0
@@ -131,8 +135,12 @@ typedef struct zgx_open_file_s {
 }zgx_open_file_t;
 
 typedef struct zgx_cycle_s {
-	zgx_open_file_t	*file;
-	int			level;
+	zgx_open_file_t			*file;
+	zgx_connection_t		*connections;
+
+	zgx_listening_t			*ls;
+	int						cpu_number;
+	int						level;
 	
 }zgx_cycle_t;
 
@@ -145,7 +153,7 @@ typedef struct zgx_listening_s {
 	#endif
 	
 	zgx_connection_handler_pt handler;
-};
+}zgx_listening_t;
 
 typedef void(*zgx_connection_handler_pt)(zgx_connection_t *c);
 typedef volatitle zgx_event_t	*zgx_posted_accept_events;

@@ -31,10 +31,11 @@ int make_deamon()
 }
 
 
-int init_listening_socket(zgx_listening_s *l)
+int init_listening_socket(zgx_listening_t *l)
 {
 	int		rc;
-	
+
+	l = malloc(sizeof(zgx_listening_t));
 	l.fd = socket(AF_INET,SOCK_STREAM,0);
 	if (l.fd  < 0) {
 		perror("socket()");
@@ -69,6 +70,8 @@ int init_listening_socket(zgx_listening_s *l)
 		return -1;		
 	}
 
+	cycle.ls = l;
+
 	return 0;
 	
 }
@@ -77,28 +80,24 @@ void zgx_worker_process_init(int worker)
 {
 	cpu_set_t mask;
 	int			i;
-	
-	CPU_ZERO(&mask);
-	i = 0;
-	
-	while ( cpu_num ) {
-		CPU_SET(i, &mask);
-		i++;
-		cpu_num --;
-	}
 
-	if (cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_PID, -1,
-                           sizeof(cpuset_t), &mask) == -1){
-		zgx_log(ERROR,"cpu_setaffinity() failed!");
+	i = worker % cycle.cpu_number;
+	CPU_ZERO(&mask);
+	CPU_SET(i, &mask);
+	if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) == -1){
+		zgx_log(ERROR,"sched_setaffinity() failed!");
 	}
+	
 }
 void * zgx_worker_process(void *data)
 {
 	int worker = (int) data;
+	int		ep;
 	
 	zgx_worker_process_init(worker);
 	setproctitle("%s","work_process");
 	
+	ep = 
 	
 }
 
@@ -125,6 +124,11 @@ void cycle_init()
 {
 	zgx_log_init();
 	cycle.level = conf.llevel;
+
+	/*
+	*get cpu number
+	*/
+	cycle.cpu_number = sysconf(_SC_NPROCESSORS_ONLN);
 	
 }
 
@@ -212,7 +216,7 @@ int main(int argc, char *argv[])
 	fprintf(pidfd,"%d\n",(int)getpid());
 	fclose(pidfd);
 
-	if ( init_listening_socket(listen) < 0) {
+	if ( init_listening_socket(listen) < 0 ) {
 		return -1;
 	}
 	
