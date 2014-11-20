@@ -10,12 +10,15 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <unistd.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <stdarg.h>
 #include <sys/time.h>
 #include <sys/cpuset.h>
 #include <unistd.h>
+#include <errno.h>
+
+#include <sys/epoll.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #define _GNU_SOURCE
 #include <sched.h>
@@ -24,6 +27,10 @@
 #define ZGX_OK 0
 
 extern configure_t		conf;
+
+sig_atomic_t zgx_terminate;
+
+
 typedef enum {
 	HTTP_METHOD_UNSET = -1,
 	HTTP_METHOD_GET,
@@ -105,6 +112,7 @@ typedef struct configure {
 	char				*log;
 	char				*error_log;
 	int					llevel;
+	unsigned long		connections_n;
 	
 }configure_t;
 
@@ -116,6 +124,7 @@ typedef struct zgx_event_s {
 	unsigned		write:1;
 	unsigned		read:1;
 	unsigned		ready:1;
+	unsigned		active:1;
 
 	/* the links of the posted queue */
     zgx_event_t     *next;
@@ -139,10 +148,28 @@ typedef struct zgx_cycle_s {
 	zgx_connection_t		*connections;
 
 	zgx_listening_t			*ls;
+	zgx_listening_t			*next;
+	int						listen_num;
+	
 	int						cpu_number;
 	int						level;
 	
+	unsigned				use_accept_mutex:1;
+	
 }zgx_cycle_t;
+
+typedef struct zgx_process_cycle_s {
+	zgx_connection_t		*connections;
+	zgx_connection_t		*free_connections;
+	
+	zgx_event_t				*read_events;
+	zgx_event_t				*write_events;
+	struct epoll_event  	*event_list;
+	
+	unsigned long 			used_connections;
+	int 					epfd;
+	
+}zgx_process_cycle_t;
 
 typedef struct zgx_listening_s {
 	int				fd; //listen fd

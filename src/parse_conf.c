@@ -81,10 +81,15 @@ int parse_conf(char *conf_file)
 
 		if (!strncmp("llevel",start,((int)end-(int)start)/sizeof(char))) {
 			end++;
-			conf.llevel= atoi(end);
+			conf.llevel = atoi(end);
 			fprintf(stdout,"use [%d] level!\n",conf.llevel);
 		}		
-	
+
+		if (!strncmp("connections_n",start,((int)end-(int)start)/sizeof(char))) {
+			end++;
+			conf.connections_n = atol(end);
+			fprintf(stdout,"use [%lu] connections\n",conf.connections_n);
+		}
 	}
 
 	return ZGX_OK;	
