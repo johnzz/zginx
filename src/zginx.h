@@ -24,12 +24,18 @@
 #include <sched.h>
 
 #define ZGX_INVALID_FILE -1
-#define ZGX_OK 0
+#define ZGX_OK		0
+#define ZGX_ERROR	-1
 
 extern configure_t		conf;
 
 sig_atomic_t zgx_terminate;
 
+typedef volatile unsigned int zgx_atomic_t ;
+
+typedef struct {
+	zgx_atomic_t	*lock;
+}zgx_shmtx_t;
 
 typedef enum {
 	HTTP_METHOD_UNSET = -1,

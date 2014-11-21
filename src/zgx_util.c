@@ -28,3 +28,4 @@ void * zgx_calloc(size_t size)
 	
 	return NULL;
 }
+

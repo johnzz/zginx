@@ -1,11 +1,17 @@
 #include "zgx_epoll.h"
 
+int		use_accept_mutex;
+int		accept_mutex_held;
+unsigned int	timeout;
+unsigned int	accept_disabled;
+
 void zgx_accept_event()
 {
 }
 
 zgx_connection_t * zgx_get_connection(int fd)
 {
+	
 }
 
 void zgx_process_event_init(zgx_process_cycle_t *process_cycle)
@@ -82,5 +88,25 @@ void zgx_process_event_init(zgx_process_cycle_t *process_cycle)
 
 void zgx_process_event(zgx_process_cycle_t *process_cycle)
 {
+	int flags;
 	
+	if (use_accept_mutex) {
+		if (accept_disabled > 0) {
+			accept_disabled--;
+		} else {
+			if (zgx_trylock_enable_accept(process_cycle) == ZGX_ERROR) {
+				return;
+			}
+
+			if (accept_mutex_held) {
+				flags |= ZGX_POST_EVENTS;
+			}
+		}
+	}
 }
+
+int zgx_trylock_enable_accept()
+{
+	if (zgx_lock)
+}
+

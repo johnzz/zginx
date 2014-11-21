@@ -122,9 +122,12 @@ void * zgx_worker_process_cycle(void *data)
 			
 			zgx_process_exit(process_cycle);
 		}
-		
+
+		zgx_log(DEBUG,"in worker cycle!");
+
 		zgx_process_event_init(process_cycle); 
-		zgx_process_event();
+		zgx_trylock_enable_accept();
+		zgx_process_event(process_cycle);
 		
 	}
 }
