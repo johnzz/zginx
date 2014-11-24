@@ -73,7 +73,7 @@ typedef struct zgx_connection_s {
 	void				*data;
 	zgx_event_t			*read;
 	zgx_event_t			*write;
-	int					fd;
+	int					 fd;
 
 	
 	#ifdef USE_SSL
@@ -84,7 +84,9 @@ typedef struct zgx_connection_s {
     socklen_t           local_socklen;
 	int					connection_status;
 	zgx_buff_t			*buffer;
-	
+
+	unsigned            tcp_nodelay:2;   
+    unsigned            tcp_nopush:2;   
 	unsigned			reuse:1;
 	
 }zgx_connection_t;
@@ -119,6 +121,7 @@ typedef struct configure {
 	char				*error_log;
 	int					llevel;
 	unsigned long		connections_n;
+	zgx_open_file_t		*lockfile;
 	
 }configure_t;
 
@@ -131,6 +134,7 @@ typedef struct zgx_event_s {
 	unsigned		read:1;
 	unsigned		ready:1;
 	unsigned		active:1;
+	unsigned		instance:1;
 
 	/* the links of the posted queue */
     zgx_event_t     *next;
@@ -172,24 +176,28 @@ typedef struct zgx_process_cycle_s {
 	zgx_event_t				*write_events;
 	struct epoll_event  	*event_list;
 	
-	unsigned long 			used_connections;
+	unsigned long 			free_connection_n;
 	int 					epfd;
+
+	//zgx_shmtx_t				*zgx_shmtx;
 	
 }zgx_process_cycle_t;
 
 typedef struct zgx_listening_s {
 	int				fd; //listen fd
-	//struct sockaddr	 sockaddr;
+	
+	struct sockaddr	 sockaddr;
 	struct sockadd_in sa_in;
 	socklen_t		socklen;
 	#ifdef USE_IPV6
 	#endif
-	
+
+	zgx_connection_t		*connection;
 	zgx_connection_handler_pt handler;
 }zgx_listening_t;
 
 typedef void(*zgx_connection_handler_pt)(zgx_connection_t *c);
-typedef volatitle zgx_event_t	*zgx_posted_accept_events;
-typedef	volatitle zgx_event_t	*zgx_posted_events;
+volatitle zgx_event_t	*zgx_posted_accept_events;
+volatitle zgx_event_t	*zgx_posted_events;
 typedef void (*zgx_spawn_proc_pt) (void *data);
 extern zgx_cycle_t cycle;

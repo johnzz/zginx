@@ -90,6 +90,13 @@ int parse_conf(char *conf_file)
 			conf.connections_n = atol(end);
 			fprintf(stdout,"use [%lu] connections\n",conf.connections_n);
 		}
+
+		if (!strncmp("lockfile",start,((int)end-(int)start)/sizeof(char))) {
+			if ( conf_set_value(end,line,conf.lockfile) < 0) {
+				fprintf(stderr,"Can't set [pidfile] config item!\n");
+				return -1;
+			}
+		}
 	}
 
 	return ZGX_OK;	
