@@ -1,4 +1,5 @@
 #include "zginx.h"
+#include "zgx_epoll.h"
 
 configure_t		conf;
 
@@ -50,6 +51,12 @@ int parse_conf(char *conf_file)
 			end++;
 			conf.process_num = atoi(end);
 			fprintf(stdout,"startup %d process!\n",conf.process_num);
+		}
+
+		if (!strncmp("events",start,((int)end-(int)start)/sizeof(char))) {
+			end++;
+			conf.events= atoi(end);
+			fprintf(stdout,"use epoll %lu events!\n",conf.events);
 		}
 		
 		if (!strncmp("host",start,((int)end-(int)start)/sizeof(char))) {

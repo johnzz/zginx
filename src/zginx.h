@@ -121,6 +121,7 @@ typedef struct configure {
 	char				*error_log;
 	int					llevel;
 	unsigned long		connections_n;
+	unsigned long		events;
 	zgx_open_file_t		*lockfile;
 	
 }configure_t;

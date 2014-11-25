@@ -3,10 +3,19 @@
 #define ZGX_SOCKADDRLEN 512 
 #define	ZGX_BUFFER_SIZE	1024
 
+#define ZGX_POST_EVENTS 1
+
 int		use_accept_mutex = 1;
 int		accept_mutex_held;
 unsigned int	timeout = 500 //ms;
-unsigned int	accept_disabled = 0;
+static int	accept_disabled = 0;
+static zgx_event_t		*event_list;
+static unsigned long	g_events;
+
+static void zgx_locked_inqueue(zgx_event_t **queue, zgx_event_t *ev)
+{
+	
+}
 
 void zgx_accept_event(zgx_event_t *ev)
 {
@@ -107,6 +116,7 @@ zgx_connection_t * zgx_get_connection(zgx_process_cycle_t *process_cycle, int fd
 	memset(rev, 0, sizeof(zgx_event_t));
 	memset(wev, 0, sizeof(zgx_event_t));
 
+	//why malloc last bit is 0?
 	rev->instance = !instance;
 	wev->instance = !instance;
 
@@ -199,8 +209,14 @@ void zgx_process_event_init(zgx_process_cycle_t *process_cycle)
 
 	cycle.ls->connection = c;
 	cycle.ls->handler = zgx_set_ls_handler;
-
-		
+	
+	g_events = conf.events;
+	event_list = zgx_alloc(g_events*sizeof(zgx_event_t));
+	if (!event_list) {
+		zgx_log(ERROR,"alloc event_list error!");
+		return;
+	}
+	
 	return ;
 }
 
@@ -264,9 +280,63 @@ static int zgx_epoll_del_event(zgx_event_t *ev, int event)
 
 }
 
-void zgx_epoll_process_events(zgx_process_cycle_t *process_cycle, int timeout, int flags)
+void zgx_epoll_process_events(zgx_process_cycle_t *process_cycle,
+										int timeout, int flags)
 {
+	zgx_event_t		*rev,*wev,**queue;
+	unsigned long	i,ret;
+	zgx_event_t		*event;
+	zgx_connection_t	*c;
+	unsigned int	 instance;
+	int				revents;
+	
 
+	ret = epoll_wait(process_cycle.epfd, event_list, g_events, timeout);
+
+	for (i=0; i<ret; i++) {
+		event = event_list[i];
+		
+		c = event->data.ptr;
+		instance = (unsigned int)c & 1;
+		c = (zgx_connection_t *)((unsigned int)c & (unsigned int)~1);
+
+		rev = c->read;
+		//wev = c->write;
+
+		revents = event->events;
+
+		if (c->fd == -1 || rev->instance != instance) {
+			zgx_log(ERROR,"stale connection %p",c);
+			continue;
+		}
+
+		if (revents &(EPOLLERR|EPOLLHUP)) {
+			zgx_log(ERROR,"epoll_wait() error on fd:%d ev:%04xd",c->fd,revents);
+		}
+
+		if ((revents & EPOLLIN) && rev->active) {
+			if (flags & ZGX_POST_EVENTS) {
+				queue = (rev->accept ? &zgx_posted_accept_events:&zgx_posted_events);
+				zgx_locked_inqueue(queue,rev);
+				continue;
+			} else {
+				rev->handler(rev);
+			}
+		}
+
+		wev = c->write;
+		if ((revents & EPOLLOUT) && wev->active) {
+			if (flags & ZGX_POST_EVENTS) {
+				queue = &zgx_posted_events;
+				zgx_locked_inqueue(queue,wev);
+			} else {
+				wev->handler(wev);
+			}
+		}		
+
+		
+	}
+	
 }
 
 static int zgx_enable_accept(void)
