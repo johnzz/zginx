@@ -3,7 +3,7 @@
 #define ZGX_MAX_PROCESS 1024
 zgx_cycle_t cycle;
 
-zgx_process_cycle_t *process_cycle;
+zgx_process_cycle_t process_cycle;
 
 int make_deamon()
 {
@@ -121,14 +121,14 @@ void * zgx_worker_process_cycle(void *data)
 		if (zgx_terminate) {
 			zgx_log(ERROR,"process is exit!");
 			
-			zgx_process_exit(process_cycle);
+			zgx_process_exit(&process_cycle);
 		}
 
 		zgx_log(DEBUG,"in worker cycle!");
 
-		zgx_process_event_init(process_cycle); 
+		zgx_process_event_init(&process_cycle); 
 		//zgx_trylock_enable_accept();
-		zgx_process_events(process_cycle);
+		zgx_process_events(&process_cycle);
 		
 	}
 }

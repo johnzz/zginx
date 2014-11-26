@@ -8,6 +8,9 @@
 #define ZGX_READ_EVENT     (EPOLLIN|EPOLLRDHUP)
 #define ZGX_WRITE_EVENT    EPOLLOUT
 
+#define ZGX_DISABLE_EVENT	1
+#define	ZGX_CLOSE_EVENT		2
+
 typedef enum {
 	ACCEPT = 0,
 	

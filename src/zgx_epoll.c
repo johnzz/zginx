@@ -14,7 +14,33 @@ static unsigned long	g_events;
 
 static void zgx_locked_inqueue(zgx_event_t **queue, zgx_event_t *ev)
 {
+	if (ev->next == NULL) {
+		ev->next = (zgx_event_t *) *queue;
+		ev->prev = (zgx_event_t **)queue;
+		*queue = ev;
+		
+		if (ev->next) {
+			ev->next->prev = &ev->next;
+		}
+		
+	}
 	
+	zgx_log(DEBUG,"Update event  %p ",ev);
+}
+
+static void zgx_locked_outqueue(zgx_event_t *ev)
+{
+/*
+	if (!*queue) {
+		zgx_log(ERROR,"queue:%p is empty",queue);
+		return;
+	}
+*/
+	*(ev->prev) = ev->next;
+	if (ev->next) {
+		ev->next->prev = ev->prev;
+	}
+	ev->prev = NULL;
 }
 
 void zgx_accept_event(zgx_event_t *ev)
@@ -42,7 +68,7 @@ void zgx_accept_event(zgx_event_t *ev)
 		}
 	}
 
-	c = zgx_get_connection(process_cycle, cfd);
+	c = zgx_get_connection(&process_cycle, cfd);
 	if (!c) {
 		zgx_log(ERROR,"zgx_get_connection failed!");
 		return;
@@ -65,6 +91,7 @@ void zgx_accept_event(zgx_event_t *ev)
 
 static void zgx_read_request_handler(zgx_event_t *e)
 {
+	
 }
 
 static void zgx_request_handler(zgx_event_t *e) 
@@ -131,11 +158,14 @@ zgx_connection_t * zgx_get_connection(zgx_process_cycle_t *process_cycle, int fd
 
 static void zgx_set_ls_handler(zgx_connection_t *e)
 {
+	zgx_log(DEBUG,"zgx_set_ls_handler read and write handler!");
+	
 	if (e) {
 		e->read->handler = zgx_read_request_handler;
 		e->write->handler = zgx_request_handler;
 		return;
 	}
+	
 	zgx_log(ERROR,"zgx_set_ls_handler error!");
 }
 
@@ -188,12 +218,12 @@ void zgx_process_event_init(zgx_process_cycle_t *process_cycle)
 		
 	} while (i)
 
-	process_cycle.free_connections = next;
+	process_cycle->free_connections = next;
 	
 	process_cycle.epfd = epoll_create( conf.connections_n/2 );
 	ee.data.fd = cycle.ls.fd;
 	ee.events = EPOLLIN|EPOLLET;
-	if ( epoll_ctl(process_cycle.epfd, ZGX_EPOLL_CTL_ADD, cycle.ls.fd, &ee) < 0 ) {
+	if ( epoll_ctl(process_cycle->epfd, ZGX_EPOLL_CTL_ADD, cycle.ls.fd, &ee) < 0 ) {
 		zgx_log(ERROR,"epoll_ctl process_cycle.epfd error!");
 		return;
 	}
@@ -253,9 +283,42 @@ void zgx_process_events(zgx_process_cycle_t *process_cycle)
 	}
 }
 
-static int zgx_epoll_add_event(zgx_event_t *ev, int event)
+static int zgx_epoll_add_event(zgx_event_t *ev, int event,int flags)
 {
+	zgx_event_t		*e;
+	zgx_connection_t	*c;
+	struct	epoll_event *ee;
+	int		prev,events,op;
 	
+	c = ev->data;
+
+	if (event == ZGX_READ_EVENT) {
+		e = ev->write;
+		prev = EPOLLOUT;
+	}  else {
+		e = c->read;
+		prev = EPOLLIN | EPOLLRDHUP;
+	}
+
+	if (ev->active) {
+		op = EPOLL_CTL_MOD;
+		events |= prev;
+	} else {
+		op = EPOLL_CTL_ADD;
+		
+	}
+
+	ee.events = events | flags;
+	ee.data.ptr = (void *)((int)c | ev->instance);
+
+	if (epoll_ctl(process_cycle->epfd, op, c->fd, &ee) == -1) {
+		zgx_log(ERROR,"epoll_ctl(%d,%d) add events error!",op,c->fd);
+		return ZGX_ERROR;
+	}
+	
+	ev->active = 1;
+	
+	return ZGX_OK;
 }
 
 static int zgx_epoll_add_conn(zgx_connection_t *c) 
@@ -275,9 +338,47 @@ static int zgx_epoll_add_conn(zgx_connection_t *c)
 
 	return ZGX_OK;
 }
-static int zgx_epoll_del_event(zgx_event_t *ev, int event)
+static int zgx_epoll_del_event(zgx_event_t *ev, int event, int flags)
 {
+	struct epoll_event		*ee;
+	zgx_connection_t		*c;
+	zgx_event_t				*e;
+	int						prev,op;
+	
+	if (flags | ZGX_DISABLE_EVENT) {
+		ev->active = 0;
+		return ZGX_OK;
+	}
 
+	c = ev->data;
+	if (event == ZGX_READ_EVENT) {
+		e = c->write;
+		prev = EPOLLOUT;
+	} else {
+		e = c->read;
+		prev = EPOLLIN |EPOLLRDHUP;
+	}
+	
+	if (e->active) {
+		op = EPOLL_CTL_MOD;
+		ee.events = prev | flags;
+		ee.data.ptr = (void *)((int) c | ev->instance);
+	} else {
+		op = EPOLL_CTL_DEL;
+		ee.events = 0;
+		ee.data.ptr = NULL;
+	}
+
+	zgx_log(DEBUG,"epoll_ctl(%d,ZGX_EPOLL_CTL_ADD) !",process_cycle.epfd)
+	
+	if (epoll_ctl(process_cycle.epfd, op, c->fd, &ee) == -1) {
+		zgx_log(ERROR,"epoll_ctl(%d,ZGX_EPOLL_CTL_ADD) failed!",process_cycle.epfd);
+		return ZGX_ERROR;		
+	}
+	
+	ev->active = 0;
+
+	return ZGX_OK;
 }
 
 void zgx_epoll_process_events(zgx_process_cycle_t *process_cycle,
@@ -371,7 +472,7 @@ static int zgx_disable_accept()
 		continue;
 	}
 	
-	if (zgx_epoll_del_event(c->read, ZGX_READ_EVENT) == ZGX_ERROR ) {
+	if (zgx_epoll_del_event(c->read, ZGX_READ_EVENT, ZGX_DISABLE_EVENT) == ZGX_ERROR ) {
 		return ZGX_ERROR;
 	}
 
