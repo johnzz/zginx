@@ -13,7 +13,7 @@
 
 typedef enum {
 	ACCEPT = 0,
-	
+
 }connection_status;
 
 

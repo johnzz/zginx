@@ -11,7 +11,6 @@
 #include <sys/resource.h>
 #include <sys/types.h>
 #include <pwd.h>
-#include <unistd.h>
 #include <stdarg.h>
 #include <time.h>
 #include <fcntl.h>
@@ -153,7 +152,7 @@ typedef struct configure {
 	int					llevel;
 	unsigned long		connections_n;
 	unsigned long		events;
-	zgx_open_file_t		*lockfile;
+	char        		*lockfile;
 
 }configure_t;
 

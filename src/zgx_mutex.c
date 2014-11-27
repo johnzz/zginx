@@ -7,12 +7,12 @@ int zgx_shmtx_init()
 {
 	int		fd;
 
-    fd = open(conf.lockfile->name,O_RDWR|O_CREAT|O_APPEND,S_IRWXU|S_IRGRP|S_IROTH);
+    fd = open(conf.lockfile,O_RDWR|O_CREAT|O_APPEND,S_IRWXU|S_IRGRP|S_IROTH);
 	if ( fd == -1 ) {
-		zgx_log(ERROR,"open lockfile %s error!",conf.lockfile->name);
+		zgx_log(ERROR,"open lockfile %s error!",conf.lockfile);
 		return ZGX_ERROR;
 	}
-	zgx_shmtx.name = conf.lockfile->name;
+	zgx_shmtx.name = conf.lockfile;
 
 	return ZGX_OK;
 }

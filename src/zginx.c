@@ -23,10 +23,11 @@ int make_deamon()
 		return -1;
 	}
 	chdir("/");
-	for (i=0; i<getdtablesize();i++) {
-		close(i);
-	}
 	
+    close(stdout);
+	close(stdin);
+	close(stderr);
+
 	umask(0);
 	
 	return 0;
@@ -80,7 +81,6 @@ int init_listening_socket(zgx_listening_t *l)
 	cycle.ls = l;
 
 	return 0;
-	
 }
 
 int  zgx_worker_process_init(int worker, zgx_process_cycle_t *process_cycle)
@@ -119,12 +119,11 @@ void zgx_worker_process_cycle(void *data)
 
 	for ( ;; ) {
 		if (zgx_terminate) {
-			zgx_log(ERROR,"process is exit!");
-			
+			zgx_log(ERROR,"process is exit!\n");
 			zgx_process_exit(&process_cycle);
 		}
 
-		zgx_log(DEBUG,"in worker cycle!");
+		zgx_log(DEBUG,"in worker cycle!\n");
 
 		zgx_process_event_init(&process_cycle); 
 		//zgx_trylock_enable_accept();
@@ -188,15 +187,13 @@ int main(int argc, char *argv[])
 			fprintf(stderr,"Usage:%s -c ConfigFile\r\n",argv[0]);
 			return -1;
 		}
-		
 	}
 
-    
+    fprintf(stderr,"conf path %s\n",conf_path);
 	if ( (ret = parse_conf(conf_path)) < 0) {
 		return -1;
 	}
 
-	fprintf(stderr,"Usage:%s -c ConfigFile\r\n",argv[0]);
 	cycle_init();
 	zgx_shmtx_init();
 
@@ -205,9 +202,9 @@ int main(int argc, char *argv[])
     */
 	
 	if (getuid() == 0) {
-		pwd = getpwnam(conf.user);
+		pwd = getpwnam("www");
 		if (!pwd) {
-			fprintf(stderr,"unkown user - %s",conf.user);
+			fprintf(stderr,"unkown user:%s\n",conf.user);
 			return -1;
 		}
 		

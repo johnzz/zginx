@@ -2,23 +2,63 @@
 #include "zgx_epoll.h"
 
 configure_t		conf;
+int conf_init(char *start, int flag,int len)
+{
+    char    *value = NULL;
 
-int  conf_set_value(char *ptr_start, char *ptr, char *value)
+    switch(flag) {
+        case 0:
+            value = malloc(len+1);
+            conf.user = value;
+	        strncpy(value,start,len);
+            break;
+        case 1:
+            value = zgx_calloc(len+1);
+            conf.host = value;
+            strncpy(value,start,len);
+            break;
+        case 2:
+            value = zgx_calloc(len+1);
+            conf.pidfile = value;
+            strncpy(value,start,len);
+            break;
+        case 3:
+            value = zgx_calloc(len+1);
+            conf.log = value;
+            strncpy(value,start,len);
+            break;
+        case 4:
+            value = zgx_calloc(len+1);
+            conf.lockfile = value;
+            strncpy(value,start,len);
+            break;
+        default:
+            fprintf(stderr,"can't run this default!\n");
+            break;
+
+    }
+
+}
+
+int  conf_set_value(char *ptr_start, char *ptr, char *value, int flag)
 {
 	char *start = ptr_start++;
 	char *line  = ptr;
 	char *end = NULL;
 	int len;
-	
-	if ( (end = strchr(line,'\0')) == NULL ) {
+
+    ++start;
+	if ( (end = strchr(line,'\n')) == NULL ) {
 		fprintf(stderr,"Can't find the conf value!\n");
 		return -1;
 	}
 
-	len = (int)end-(int)start /sizeof(char);
-	conf.user = malloc(len+1);
-	strncpy(value,start,len);
-	return ZGX_OK;
+    len = ((int)end -(int)start) / sizeof(char);
+	//conf.user = malloc(len+1);
+    conf_init(start,flag,len);
+
+
+    return ZGX_OK;
 }
 
 int parse_conf(char *conf_file)
@@ -27,26 +67,27 @@ int parse_conf(char *conf_file)
 	char	*start, *end;
 	char	*line;
 
-    line = (char * )zgx_alloc(1024);
-    
+    line = (char * )zgx_alloc(2048);
+
 	fp = fopen(conf_file, "r");
 	if (!fp) {
 		fprintf(stderr, "Can't open the file %s !\n",conf_file);
 		return -1;
 	}
 
-	while (fgets(line,sizeof(line),fp) != NULL) {
-		if ( (end = strchr(line,'=')) == NULL ) {
+	while (fgets(line,2048,fp) != NULL) {
+        if ( (end = strchr(line,'=')) == NULL ) {
 			fprintf(stderr,"config file [%s] is not valid!\n",conf_file);
 			return -1;
 		}
 
-		start = line;
+        start = line;
 		if (!strncmp("user",start,((int)end-(int)start)/sizeof(char))) {
-			if ( conf_set_value(end,line,conf.user) < 0) {
+			if ( conf_set_value(end,line,conf.user,0) < 0) {
 				fprintf(stderr,"Can't set [user] config item!\n");
 				return -1;
 			}
+			fprintf(stdout,"user:%s\n",conf.user);
 		}
 
 		if (!strncmp("progress_num",start,((int)end-(int)start)/sizeof(char))) {
@@ -62,10 +103,12 @@ int parse_conf(char *conf_file)
 		}
 		
 		if (!strncmp("host",start,((int)end-(int)start)/sizeof(char))) {
-			if ( conf_set_value(end,line,conf.host) < 0) {
+			if ( conf_set_value(end,line,conf.host,1) < 0) {
 				fprintf(stderr,"Can't set [host] config item!\n");
 				return -1;
 			}
+
+			fprintf(stdout,"host:%s\n",conf.host);
 		}
 		
 		if (!strncmp("port",start,((int)end-(int)start)/sizeof(char))) {
@@ -75,24 +118,27 @@ int parse_conf(char *conf_file)
 		}
 
 		if (!strncmp("pidfile",start,((int)end-(int)start)/sizeof(char))) {
-			if ( conf_set_value(end,line,conf.pidfile) < 0) {
+			if ( conf_set_value(end,line,conf.pidfile,2) < 0) {
 				fprintf(stderr,"Can't set [pidfile] config item!\n");
 				return -1;
 			}
+
+			fprintf(stdout,"pidfile:%s\n",conf.pidfile);
 		}
-		
+
 		if (!strncmp("log",start,((int)end-(int)start)/sizeof(char))) {
-			if ( conf_set_value(end,line,conf.log) < 0) {
+			if ( conf_set_value(end,line,conf.log,3) < 0) {
 				fprintf(stderr,"Can't set [log path] config item!\n");
 				return -1;
 			}
+			fprintf(stdout,"log:%s\n",conf.log);
 		}
 
 		if (!strncmp("llevel",start,((int)end-(int)start)/sizeof(char))) {
 			end++;
 			conf.llevel = atoi(end);
 			fprintf(stdout,"use [%d] level!\n",conf.llevel);
-		}		
+		}
 
 		if (!strncmp("connections_n",start,((int)end-(int)start)/sizeof(char))) {
 			end++;
@@ -101,12 +147,14 @@ int parse_conf(char *conf_file)
 		}
 
 		if (!strncmp("lockfile",start,((int)end-(int)start)/sizeof(char))) {
-			if ( conf_set_value(end,line,conf.lockfile->name) < 0) {
+			if ( conf_set_value(end,line,conf.lockfile,4) < 0) {
 				fprintf(stderr,"Can't set [pidfile] config item!\n");
 				return -1;
 			}
+
+			fprintf(stdout,"lockfile:%s\n",conf.lockfile);
 		}
 	}
 
-	return ZGX_OK;	
+	return ZGX_OK;
 }
