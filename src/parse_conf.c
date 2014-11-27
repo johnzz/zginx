@@ -1,4 +1,4 @@
-#include "zginx.h"
+//#include "zginx.h"
 #include "zgx_epoll.h"
 
 configure_t		conf;
@@ -23,12 +23,14 @@ int  conf_set_value(char *ptr_start, char *ptr, char *value)
 
 int parse_conf(char *conf_file)
 {
-	File	*fp;
+	FILE	*fp;
 	char	*start, *end;
-	char	line[1024];
+	char	*line;
 
-	fp = fopen(conf_file,"r");
-	if (fp == ZGX_INVALID_FILE) {
+    line = (char * )zgx_alloc(1024);
+    
+	fp = fopen(conf_file, "r");
+	if (!fp) {
 		fprintf(stderr, "Can't open the file %s !\n",conf_file);
 		return -1;
 	}
@@ -38,7 +40,7 @@ int parse_conf(char *conf_file)
 			fprintf(stderr,"config file [%s] is not valid!\n",conf_file);
 			return -1;
 		}
-		
+
 		start = line;
 		if (!strncmp("user",start,((int)end-(int)start)/sizeof(char))) {
 			if ( conf_set_value(end,line,conf.user) < 0) {
@@ -99,7 +101,7 @@ int parse_conf(char *conf_file)
 		}
 
 		if (!strncmp("lockfile",start,((int)end-(int)start)/sizeof(char))) {
-			if ( conf_set_value(end,line,conf.lockfile) < 0) {
+			if ( conf_set_value(end,line,conf.lockfile->name) < 0) {
 				fprintf(stderr,"Can't set [pidfile] config item!\n");
 				return -1;
 			}

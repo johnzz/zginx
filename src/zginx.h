@@ -1,6 +1,8 @@
-#include <sys/net.h>
+//#include <sys/net.h>
+#define _GNU_SOURCE
+#include <sched.h>
+#include <sys/stat.h>
 #include <event.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,31 +13,27 @@
 #include <pwd.h>
 #include <unistd.h>
 #include <stdarg.h>
-#include <sys/time.h>
-#include <sys/cpuset.h>
+#include <time.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-
+#include <signal.h>
 #include <sys/epoll.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define _GNU_SOURCE
-#include <sched.h>
 
+
+#include "zgx_mutex.h"
 #define ZGX_INVALID_FILE -1
 #define ZGX_OK		0
 #define ZGX_ERROR	-1
 
-extern configure_t		conf;
 
 sig_atomic_t zgx_terminate;
 
 typedef volatile unsigned int zgx_atomic_t ;
 
-typedef struct {
-	zgx_atomic_t	*lock;
-}zgx_shmtx_t;
 
 typedef enum {
 	HTTP_METHOD_UNSET = -1,
@@ -69,7 +67,34 @@ typedef struct zgx_buff_s {
 	size_t		size;
 }zgx_buff_t;
 
-typedef struct zgx_connection_s {
+typedef struct zgx_event_s zgx_event_t;
+typedef struct zgx_open_file_s zgx_open_file_t;
+typedef struct zgx_queue_s  zgx_queue_t;
+typedef struct zgx_listening_s zgx_listening_t;
+
+typedef struct zgx_connection_s zgx_connection_t;
+typedef void(*zgx_connection_handler_pt)(zgx_connection_t *c);
+typedef void (*zgx_event_handler_pt)(zgx_event_t *ev);
+
+struct zgx_event_s {
+	void			*data;
+	unsigned		accept:1;
+	unsigned		write:1;
+	unsigned		read:1;
+	unsigned		ready:1;
+	unsigned		active:1;
+	unsigned		instance:1;
+
+	/* the links of the posted queue */
+    zgx_event_t     *next;
+    zgx_event_t    **prev;
+
+	zgx_event_handler_pt	handler;
+};
+
+
+
+struct zgx_connection_s {
 	void				*data;
 	zgx_event_t			*read;
 	zgx_event_t			*write;
@@ -89,7 +114,7 @@ typedef struct zgx_connection_s {
     unsigned            tcp_nopush:2;   
 	unsigned			reuse:1;
 	
-}zgx_connection_t;
+};
 
 typedef struct zgx_request_s {
 	zgx_buff_t		*request;
@@ -110,8 +135,14 @@ typedef struct zgx_request_s {
 	
 }zgx_request_t;
 
+struct zgx_open_file_s {
+	char		*name;
+	int			fd;
+};
+
+
 typedef struct configure {
-	const char			*user;
+	char			*user;
 	char				*host;
 	int					process_num;
 	int					port;
@@ -123,36 +154,16 @@ typedef struct configure {
 	unsigned long		connections_n;
 	unsigned long		events;
 	zgx_open_file_t		*lockfile;
-	
+
 }configure_t;
 
-typedef void (*zgx_event_handler_pt)(zgx_event_t *ev);
 
-typedef struct zgx_event_s {
-	void			*data;
-	unsigned		accept:1;
-	unsigned		write:1;
-	unsigned		read:1;
-	unsigned		ready:1;
-	unsigned		active:1;
-	unsigned		instance:1;
 
-	/* the links of the posted queue */
-    zgx_event_t     *next;
-    zgx_event_t    **prev;
-	
-	zgx_event_handler_pt	handler;
-}zgx_event_t;
-
-typedef struct zgx_queue_s {
+struct zgx_queue_s {
 	zgx_queue_t 	*prev;
 	zgx_queue_t		*next;
-}zgx_queue_t;
+};
 
-typedef struct zgx_open_file_s {
-	char		*name;
-	int			fd;
-}zgx_open_file_t;
 
 typedef struct zgx_cycle_s {
 	zgx_open_file_t			*file;
@@ -160,6 +171,8 @@ typedef struct zgx_cycle_s {
 
 	zgx_listening_t			*ls;
 	zgx_listening_t			*next;
+
+    FILE                    *logfp;
 	int						listen_num;
 	
 	int						cpu_number;
@@ -184,21 +197,37 @@ typedef struct zgx_process_cycle_s {
 	
 }zgx_process_cycle_t;
 
-typedef struct zgx_listening_s {
+struct zgx_listening_s {
 	int				fd; //listen fd
 	
 	struct sockaddr	 sockaddr;
-	struct sockadd_in sa_in;
+	struct sockaddr_in sa_in;
 	socklen_t		socklen;
+    int             sin_port;
 	#ifdef USE_IPV6
 	#endif
 
 	zgx_connection_t		*connection;
 	zgx_connection_handler_pt handler;
-}zgx_listening_t;
+};
 
-typedef void(*zgx_connection_handler_pt)(zgx_connection_t *c);
-volatitle zgx_event_t	*zgx_posted_accept_events;
-volatitle zgx_event_t	*zgx_posted_events;
+/*
+typedef union epoll_data {
+    void                *ptr;
+    int                 fd;
+    unsigned int        u32;
+    unsigned long long  u64;
+} epoll_data_t;
+
+struct epoll_event {
+    uint32_t      events;
+    epoll_data_t  data;
+};
+*/
+volatile zgx_event_t	*zgx_posted_accept_events;
+volatile zgx_event_t	*zgx_posted_events;
 typedef void (*zgx_spawn_proc_pt) (void *data);
 extern zgx_cycle_t cycle;
+extern zgx_process_cycle_t process_cycle;
+extern configure_t      conf;
+extern zgx_shmtx_t      zgx_shmtx;

@@ -1,16 +1,18 @@
 #include "zgx_mutex.h"
-
+#include "zginx.h"
 
 zgx_shmtx_t		zgx_shmtx;
+
 int zgx_shmtx_init()
 {
 	int		fd;
-	fd = open(conf.lockfile);
-	if ( fd==-1 ) {
-		zgx_log(ERROR,"open lockfile %s error!",conf.lockfile);
+
+    fd = open(conf.lockfile->name,O_RDWR|O_CREAT|O_APPEND,S_IRWXU|S_IRGRP|S_IROTH);
+	if ( fd == -1 ) {
+		zgx_log(ERROR,"open lockfile %s error!",conf.lockfile->name);
 		return ZGX_ERROR;
 	}
-	zgx_shmtx.name = conf.lockfile;
+	zgx_shmtx.name = conf.lockfile->name;
 
 	return ZGX_OK;
 }

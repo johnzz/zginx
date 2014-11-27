@@ -1,6 +1,6 @@
 #include "zginx.h"
 
-#define  zgx_open(name,mode,create,access) open((const char *)name,mode|create|O_BINARY,access)
+#define  zgx_open(name,mode,create,access) open((const char *)name,mode|create,access)
 #define  MAX_TEXT 4096
 
 int zgx_log_init()
@@ -17,9 +17,9 @@ int zgx_log_init()
 			return -1;
 		}
 		
-		cycle.file.fd = lfd;
+		cycle.file->fd = lfd;
 		
-		log.name = conf.log;
+		log->name = conf.log;
 		
 	}
 	return 0;
@@ -29,7 +29,7 @@ void zgx_localtime(time_t sec, struct tm *tm)
 {
 	struct tm	*t;
 	t = localtime(&sec);
-	*tm = *t;
+	tm = t;
 
 	tm->tm_mon++;
     tm->tm_year += 1900;
@@ -37,7 +37,7 @@ void zgx_localtime(time_t sec, struct tm *tm)
 
 static inline ssize_t	zgx_write(const char *buff,size_t n)
 {
-	return write(cycle.file.fd,buff,n);
+	return write(cycle.file->fd,buff,n);
 }
 
 void zgx_log(int log_level, const char *fmt, ...)
@@ -53,7 +53,7 @@ void zgx_log(int log_level, const char *fmt, ...)
 	struct timeval tv;
 
 	len = sizeof("1970/01/01 01:01:01 [DEBUG] ");
-	if (log_level > = conf.llevel) {
+	if (log_level >= conf.llevel) {
 		va_start(args, fmt);
 		switch (log_level) {
 			case 0:

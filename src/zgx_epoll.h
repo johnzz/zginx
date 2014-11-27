@@ -16,6 +16,10 @@ typedef enum {
 	
 }connection_status;
 
+
+void zgx_close_accepted_connection(zgx_connection_t *c);
+//extern zgx_shmtx_t     zgx_shmtx;
+
 #endif
 
 

@@ -43,37 +43,37 @@ int init_listening_socket(zgx_listening_t *l)
 		return -1;
 	}
 	
-	l.fd = socket(AF_INET,SOCK_STREAM,0);
-	if (l.fd  < 0) {
+	l->fd = socket(AF_INET,SOCK_STREAM,0);
+	if (l->fd  < 0) {
 		perror("socket()");
 		return -1;
 	}
 
-	if (fcntl(l.fd,F_SETFL,O_NONBLOCK) < 0 ){
+	if (fcntl(l->fd,F_SETFL,O_NONBLOCK) < 0 ){
 		perror("fcntl error!");
-		close(l.fd);
+		close(l->fd);
 		return -1;
 	}
 
-	l.sa_in.sin_family = AF_INET;
-	l.sin_port = htons(conf.port);
-	if ( (rc=inet_pton(AF_INET,conf.host,(void *)&(l.sa_in.sin_addr))) < 0 ){
+	l->sa_in.sin_family = AF_INET;
+	l->sin_port = htons(conf.port);
+	if ( (rc=inet_pton(AF_INET,conf.host,(void *)&(l->sa_in.sin_addr))) < 0 ){
 		fprintf(stderr, "Illegal address: %s\n", conf.host);
-		close(l.fd);
+		close(l->fd);
 		return -1;
 	}
 
 	//setsockopt(l.fd, SOL_SOCKET, SO_REUSEADDR,const void *optval, socklen_t optlen)
 
-	if (bind(l.fd, (struct sockaddr *)&(l.sa_in), sizeof(l.sa_in)) < 0) {
+	if (bind(l->fd, (struct sockaddr *)&(l->sa_in), sizeof(l->sa_in)) < 0) {
 		fprintf(stderr,"bind error!");
-		close(l.fd);
+		close(l->fd);
 		return -1;
 	}
 
-	if (listen(l.fd,1024) < 0) {
+	if (listen(l->fd,1024) < 0) {
 		fprintf(stderr,"listen error!");
-		close(l.fd);
+		close(l->fd);
 		return -1;		
 	}
 
@@ -109,13 +109,13 @@ void zgx_process_exit(zgx_process_cycle_t *process_cycle)
 {
 }
 
-void * zgx_worker_process_cycle(void *data)
+void zgx_worker_process_cycle(void *data)
 {
 	int worker = (int) data;
 	int		ep;
 	
-	zgx_worker_process_init(worker);
-	setproctitle("%s","work_process");
+	zgx_worker_process_init(worker, &process_cycle);
+	//setproctitle("%s","work_process");
 
 	for ( ;; ) {
 		if (zgx_terminate) {
@@ -141,14 +141,13 @@ void * zgx_start_worker_process(void *data, zgx_spawn_proc_pt process)
 	switch(retpid) {
 		case -1:
 			zgx_log(ERROR,
-                      "fork() failed while spawning \"%s\"", name);	
+                      "fork() failed while spawning");
 			return -1;
 		case 0:
 			process(data);
 			break;
 		default:
 			break;
-				
 	}
 }
 
@@ -173,7 +172,7 @@ int main(int argc, char *argv[])
 	char			*conf_path;
 	struct passwd	*pwd;
 	FILE			*pidfd;
-	zgx_listening_s	*listen;
+	zgx_listening_t	*listen;
 	uid_t			uid;
 	gid_t			gid;
 	char			c;
@@ -191,11 +190,13 @@ int main(int argc, char *argv[])
 		}
 		
 	}
-	
+
+    
 	if ( (ret = parse_conf(conf_path)) < 0) {
 		return -1;
 	}
 
+	fprintf(stderr,"Usage:%s -c ConfigFile\r\n",argv[0]);
 	cycle_init();
 	zgx_shmtx_init();
 
@@ -257,7 +258,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	
-	for (i=0;i<conf.process_num,i++) {
+	for (i=0;i<conf.process_num;i++) {
 		zgx_start_worker_process((void *)(int) i, zgx_worker_process_cycle);
 	}
 	

@@ -1,6 +1,7 @@
 #ifndef __ZGX_MUTEX_H__
 #define __ZGX_MUTEX_H__
-#include "zginx.h"
+
+//#include "zginx.h"
 
 typedef struct {
 #if (ZGX_HAVE_ATOMIC_OPS)
@@ -16,5 +17,7 @@ typedef struct {
 }zgx_shmtx_t;
 
 
-extern zgx_shmtx_t		zgx_shmtx;
+//extern zgx_shmtx_t		zgx_shmtx;
+//extern configure_t      conf;
+#endif
 #endif
