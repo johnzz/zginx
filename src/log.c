@@ -29,7 +29,7 @@ void zgx_localtime(time_t sec, struct tm *tm)
 {
 	struct tm	*t;
 	t = localtime(&sec);
-	tm = t;
+	*tm = *t;
 
 	tm->tm_mon++;
     tm->tm_year += 1900;
@@ -77,8 +77,8 @@ void zgx_log(int log_level, const char *fmt, ...)
 				slevel);
 		ret_len = vsnprintf(text+len,sizeof(text)-len,fmt,args);
 		va_end(args);
-		
-		text[ret_len+len+1] = '\n';
+
+        text[ret_len+len] = '\n';
 		n = zgx_write(text,ret_len+len+1);
 
 	}

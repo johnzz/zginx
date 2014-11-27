@@ -23,10 +23,10 @@ int make_deamon()
 		return -1;
 	}
 	chdir("/");
-	
-    close(stdout);
-	close(stdin);
-	close(stderr);
+
+   // close(0);
+	//close(1);
+	//close(2);
 
 	umask(0);
 	
@@ -114,21 +114,21 @@ void zgx_worker_process_cycle(void *data)
 	int worker = (int) data;
 	int		ep;
 	
+	zgx_log(DEBUG,"in worker cycle %d!\n",getpid());
 	zgx_worker_process_init(worker, &process_cycle);
 	//setproctitle("%s","work_process");
 
-	for ( ;; ) {
+	zgx_process_event_init(&process_cycle);
+
+    for ( ; ; ) {
+        /*
 		if (zgx_terminate) {
 			zgx_log(ERROR,"process is exit!\n");
 			zgx_process_exit(&process_cycle);
 		}
-
-		zgx_log(DEBUG,"in worker cycle!\n");
-
-		zgx_process_event_init(&process_cycle); 
+*/
 		//zgx_trylock_enable_accept();
 		zgx_process_events(&process_cycle);
-		
 	}
 }
 

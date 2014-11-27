@@ -213,7 +213,7 @@ void zgx_process_event_init(zgx_process_cycle_t *process_cycle)
 		read_events = NULL;
 		return;
 	}
-	
+
 	process_cycle->connections = connections;
 	i = connections_n;
 	do {
@@ -223,7 +223,6 @@ void zgx_process_event_init(zgx_process_cycle_t *process_cycle)
 		connections[i].read = &read_events[i];
 		connections[i].write = &write_events[i];
 		next = &connections[i];
-		
 	} while (i);
 
 	process_cycle->free_connections = next;
@@ -231,22 +230,24 @@ void zgx_process_event_init(zgx_process_cycle_t *process_cycle)
 	process_cycle->epfd = epoll_create( conf.connections_n/2 );
 	ee.data.fd = cycle.ls->fd;
 	ee.events = EPOLLIN|EPOLLET;
+
+    zgx_log(DEBUG,"epoll_add listen fd:%d in epoll fd:%d!",cycle.ls->fd,process_cycle->epfd);
 	if ( epoll_ctl(process_cycle->epfd, ZGX_EPOLL_CTL_ADD, cycle.ls->fd, &ee) < 0 ) {
 		zgx_log(ERROR,"epoll_ctl process_cycle.epfd error!");
 		return;
 	}
-	
-	c = zgx_get_connection(process_cycle, cycle.ls->fd);
+
+    c = zgx_get_connection(process_cycle, cycle.ls->fd);
 	if (!c) {
 		zgx_log(ERROR,"epoll_ctl zgx_get_connection error!");
 		return;
 	}
-	
-	c->read->handler = zgx_accept_event;
+
 	c->read->accept = 1;
 
 	cycle.ls->connection = c;
 	cycle.ls->handler = zgx_set_ls_handler;
+	c->read->handler = zgx_accept_event;
 	
 	g_events = conf.events;
 	event_list = zgx_alloc(g_events*sizeof(struct epoll_event));
@@ -261,15 +262,16 @@ void zgx_process_event_init(zgx_process_cycle_t *process_cycle)
 void zgx_process_events(zgx_process_cycle_t *process_cycle)
 {
 	int flags;
-	
+
 	if (use_accept_mutex) {
 		if (accept_disabled > 0) {
 			accept_disabled--;
 		} else {
 			if (zgx_trylock_accept_mutex(process_cycle) == ZGX_ERROR) {
-				return;
+                return;
 			}
 
+            zgx_log(ERROR,"accept_mutex_held %d",accept_mutex_held);
 			if (accept_mutex_held) {
 				flags |= ZGX_POST_EVENTS;
 			}
@@ -277,8 +279,8 @@ void zgx_process_events(zgx_process_cycle_t *process_cycle)
 	}
 
 	zgx_epoll_process_events(process_cycle, timeout, flags);
-	
-	if (zgx_posted_accept_events) {
+
+    if (zgx_posted_accept_events) {
 		zgx_event_process_posted(process_cycle, &zgx_posted_accept_events);
 	}
 
@@ -320,13 +322,14 @@ static int zgx_epoll_add_event(zgx_event_t *ev,  int event,int flags)
 	ee.events = events | flags;
 	ee.data.ptr = (void *)((int)c | ev->instance);
 
+    zgx_log(ERROR,"process_cycle.epfd:%d",process_cycle.epfd);
 	if (epoll_ctl(process_cycle.epfd, op, c->fd, &ee) == -1) {
-		zgx_log(ERROR,"epoll_ctl(%d,%d) add events error!",op,c->fd);
+		zgx_log(ERROR,"epoll_ctl(%d,%d) add events error!%d",op,c->fd,errno);
 		return ZGX_ERROR;
 	}
-	
+
 	ev->active = 1;
-	
+
 	return ZGX_OK;
 }
 
@@ -462,9 +465,10 @@ static int zgx_enable_accept(void)
     }
 
 	if (zgx_epoll_add_event(c->read, ZGX_READ_EVENT,0) == ZGX_ERROR ) {
+        zgx_log(ERROR,"i'm test %d",getpid());
 		return ZGX_ERROR;
 	}
-	
+
 	return ZGX_OK;
 }
 
@@ -491,8 +495,8 @@ int zgx_trylock_accept_mutex()
 {
 	if (zgx_trylock()) {
 
-		zgx_log(DEBUG,"accept mutex locked");
-		
+		zgx_log(DEBUG,"accept mutex locked,pid:%d",getpid());
+
 		if (accept_mutex_held)
 			return ZGX_OK;
 
@@ -502,7 +506,7 @@ int zgx_trylock_accept_mutex()
 		}
 
 		accept_mutex_held = 1;
-		
+
 		return ZGX_OK;
 	}
 
