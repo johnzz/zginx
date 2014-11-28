@@ -37,6 +37,7 @@ int make_deamon()
 int init_listening_socket(zgx_listening_t *l)
 {
 	int		rc;
+    int     flags;
 
 	l = zgx_alloc(sizeof(zgx_listening_t));
 	if (!l) {
@@ -44,42 +45,46 @@ int init_listening_socket(zgx_listening_t *l)
 		return -1;
 	}
 	
-	l->fd = socket(AF_INET,SOCK_STREAM,0);
+	l->fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (l->fd  < 0) {
-		perror("socket()");
+		zgx_log(ERROR,"socket() error!");
 		return -1;
 	}
 
-	if (fcntl(l->fd,F_SETFL,O_NONBLOCK) < 0 ){
+	if (fcntl(l->fd, F_SETFL, O_NONBLOCK) < 0 ){
 		perror("fcntl error!");
 		close(l->fd);
 		return -1;
 	}
 
+    bzero(&l->sa_in,sizeof(l->sa_in));
+
 	l->sa_in.sin_family = AF_INET;
-	l->sin_port = htons(conf.port);
-	if ( (rc=inet_pton(AF_INET,conf.host,(void *)&(l->sa_in.sin_addr))) < 0 ){
-		fprintf(stderr, "Illegal address: %s\n", conf.host);
+	l->sa_in.sin_port = htons(conf.port);
+
+    if ( (rc=inet_pton(AF_INET,conf.host,(void *)&(l->sa_in.sin_addr))) < 0 ){
+		zgx_log(ERROR, "Illegal address: %s\n", conf.host);
 		close(l->fd);
 		return -1;
 	}
 
-	//setsockopt(l.fd, SOL_SOCKET, SO_REUSEADDR,const void *optval, socklen_t optlen)
+	//setsockopt(l.fd, SOL_SOCKET, SO_REUSEADDR,const void *optval, socklen_t optlen);
 
 	if (bind(l->fd, (struct sockaddr *)&(l->sa_in), sizeof(l->sa_in)) < 0) {
-		fprintf(stderr,"bind error!");
+		zgx_log(ERROR,"bind fd:%d error!",l->fd);
 		close(l->fd);
 		return -1;
 	}
 
 	if (listen(l->fd,1024) < 0) {
-		fprintf(stderr,"listen error!");
+		zgx_log(ERROR,"listen error!");
 		close(l->fd);
-		return -1;		
+		return -1;
 	}
 
 	cycle.ls = l;
 
+    zgx_log(ERROR,"bind fd:%d host:%s,port:%d,success!",l->fd,conf.host,conf.port);
 	return 0;
 }
 
@@ -141,7 +146,7 @@ void * zgx_start_worker_process(void *data, zgx_spawn_proc_pt process)
 		case -1:
 			zgx_log(ERROR,
                       "fork() failed while spawning");
-			return -1;
+			return NULL;
 		case 0:
 			process(data);
 			break;
@@ -251,8 +256,9 @@ int main(int argc, char *argv[])
 	fprintf(pidfd,"%d\n",(int)getpid());
 	fclose(pidfd);
 
+    zgx_log(ERROR,"begin to listen!");
 	if ( init_listening_socket(listen) < 0 ) {
-		return -1;
+        return -1;
 	}
 	
 	for (i=0;i<conf.process_num;i++) {

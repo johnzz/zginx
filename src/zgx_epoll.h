@@ -18,6 +18,8 @@ typedef enum {
 
 
 void zgx_close_accepted_connection(zgx_connection_t *c);
+void zgx_process_events(zgx_process_cycle_t *process_cycle);
+void zgx_process_event_init(zgx_process_cycle_t *process_cycle);
 //extern zgx_shmtx_t     zgx_shmtx;
 
 #endif

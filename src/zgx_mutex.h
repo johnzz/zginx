@@ -17,6 +17,8 @@ typedef struct {
 }zgx_shmtx_t;
 
 
+int zgx_trylock();
+void zgx_unlock(zgx_shmtx_t *zgx_shmtx);
 //extern zgx_shmtx_t		zgx_shmtx;
 //extern configure_t      conf;
 #endif

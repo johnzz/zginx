@@ -230,3 +230,5 @@ extern zgx_cycle_t cycle;
 extern zgx_process_cycle_t process_cycle;
 extern configure_t      conf;
 extern zgx_shmtx_t      zgx_shmtx;
+void * zgx_calloc(int size);
+void * zgx_alloc(int size);

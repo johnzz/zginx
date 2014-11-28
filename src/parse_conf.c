@@ -15,7 +15,7 @@ int conf_init(char *start, int flag,int len)
         case 1:
             value = zgx_calloc(len+1);
             conf.host = value;
-            strncpy(value,start,len);
+            strncpy(value,"127.0.0.1",len);
             break;
         case 2:
             value = zgx_calloc(len+1);

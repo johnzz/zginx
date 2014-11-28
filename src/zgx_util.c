@@ -1,10 +1,12 @@
 #include "zginx.h"
 
 #define zgx_memzero(buf,n) (void)memset(buf,0,n)
-void * zgx_alloc(size_t size)
+
+void * zgx_alloc(int size)
 {
 	void		*p;
-	p = malloc(size);
+
+    p = malloc(size);
 	if (p == NULL) {
 		return NULL;
 	}
@@ -16,7 +18,7 @@ void * zgx_alloc(size_t size)
 
 
 
-void * zgx_calloc(size_t size)
+void * zgx_calloc(int size)
 {
 	void		*p;
 

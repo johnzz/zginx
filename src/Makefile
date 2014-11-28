@@ -1,6 +1,6 @@
 BIN = ./bin
 CC = gcc
-CFLAGS = -I.
+CFLAGS += -I.
 DEPS = zginx.h zgx_epoll.h
 TARGET = zginx
 
