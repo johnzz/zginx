@@ -1,6 +1,6 @@
 BIN = ./bin
 CC = gcc
-CFLAGS += -I.
+CFLAGS += -DUSE_SSL -DTCP_NOPUSH -I.
 DEPS = zginx.h zgx_epoll.h
 TARGET = zginx
 

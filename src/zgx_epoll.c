@@ -4,6 +4,7 @@
 #define	ZGX_BUFFER_SIZE	1024
 
 #define ZGX_POST_EVENTS 1
+#define zgx_nonblocking(s)  fcntl(s, F_SETFL, fcntl(s, F_GETFL) | O_NONBLOCK)
 
 int		use_accept_mutex = 1;
 int		accept_mutex_held;
@@ -26,13 +27,13 @@ static void zgx_locked_inqueue(zgx_event_t **queue, zgx_event_t *ev)
 		ev->next = (zgx_event_t *) *queue;
 		ev->prev = (zgx_event_t **)queue;
 		*queue = ev;
-		
+
 		if (ev->next) {
 			ev->next->prev = &ev->next;
 		}
-		
+
 	}
-	
+
 	zgx_log(DEBUG,"Update event  %p ",ev);
 }
 
@@ -62,8 +63,6 @@ void zgx_accept_event(zgx_event_t *ev)
 	int			socklen = ZGX_SOCKADDRLEN;
 	int			err;
 	
-    zgx_log(DEBUG,"accepte handler!");
-
 	l = cycle.ls;
 
     cfd = accept(l->fd, (struct sockaddr *)sa, &socklen);
@@ -78,6 +77,7 @@ void zgx_accept_event(zgx_event_t *ev)
 		}
 	}
 
+    zgx_nonblocking(cfd);
 	c = zgx_get_connection(&process_cycle, cfd);
 	if (!c) {
 		zgx_log(ERROR,"zgx_get_connection failed!");
@@ -96,15 +96,20 @@ void zgx_accept_event(zgx_event_t *ev)
 	if (zgx_epoll_add_conn(c) == ZGX_ERROR) {
 		zgx_close_accepted_connection(c);
 	}
-	
-	if (zgx_trylock_accept_mutex(process_cycle) == ZGX_ERROR) {
-         return;
-	}
 }
 
 static void zgx_read_request_handler(zgx_event_t *e)
 {
-	
+    zgx_connection_t        *c;
+    char    buff[1024];
+    
+    zgx_log(DEBUG,"i 'm read request handler!'");
+    c = e->data;
+    c = (zgx_connection_t *)((unsigned int)c & (unsigned int)~1);
+    sprintf(buff,"i'm a test !");
+    write(c->fd, buff, strlen(buff));
+    close(c->fd);
+    return;
 }
 
 static void zgx_request_handler(zgx_event_t *e) 
@@ -171,14 +176,12 @@ zgx_connection_t * zgx_get_connection(zgx_process_cycle_t *process_cycle, int fd
 
 static void zgx_set_ls_handler(zgx_connection_t *e)
 {
-	zgx_log(DEBUG,"zgx_set_ls_handler read and write handler!");
-	
 	if (e) {
 		e->read->handler = zgx_read_request_handler;
 		e->write->handler = zgx_request_handler;
 		return;
 	}
-	
+
 	zgx_log(ERROR,"zgx_set_ls_handler error!");
 }
 
@@ -275,11 +278,11 @@ void zgx_process_events(zgx_process_cycle_t *process_cycle)
 		if (accept_disabled > 0) {
 			accept_disabled--;
 		} else {
-            
+
 			if (zgx_trylock_accept_mutex(process_cycle) == ZGX_ERROR) {
                 return;
 			}
-            
+
 
             zgx_log(ERROR,"accept_mutex_held %d",accept_mutex_held);
 			if (accept_mutex_held) {
@@ -424,13 +427,9 @@ void zgx_epoll_process_events(zgx_process_cycle_t *process_cycle,
 	for (i=0; i<ret; i++) {
 		c = event_list[i].data.ptr;
 
-        zgx_log(DEBUG,"before & instance get c %p",c);
 		instance = (unsigned int)c & 1;
 		c = (zgx_connection_t *)((unsigned int)c & (unsigned int)~1);
 
-        zgx_log(DEBUG,"after & instance get c %p",c);
-
-        zgx_log(DEBUG,"get c %p c->fd %d ",c,c->fd);
 		rev = c->read;
 		//wev = c->write;
 
@@ -447,7 +446,6 @@ void zgx_epoll_process_events(zgx_process_cycle_t *process_cycle,
 
 		if ((revents & EPOLLIN) && rev->active) {
 			if (flags & ZGX_POST_EVENTS) {
-                zgx_log(DEBUG,"read inqueue zgx_posted_accept_events!");
 				queue = (zgx_event_t **)(rev->accept ? &zgx_posted_accept_events:&zgx_posted_events);
 				zgx_locked_inqueue(queue,rev);
 				continue;
@@ -460,7 +458,6 @@ void zgx_epoll_process_events(zgx_process_cycle_t *process_cycle,
 		wev = c->write;
 		if ((revents & EPOLLOUT) && wev->active) {
 			if (flags & ZGX_POST_EVENTS) {
-                zgx_log(DEBUG,"write inqueue zgx_posted_accept_events!");
 				queue = (zgx_event_t **)&zgx_posted_events;
 				zgx_locked_inqueue(queue,wev);
 			} else {
@@ -548,6 +545,18 @@ int zgx_trylock_accept_mutex()
 
 void zgx_event_process_posted(zgx_process_cycle_t *pc, volatile zgx_event_t **events)
 {
+    zgx_event_t     *ev;
 
+    for( ;; ){
+        ev = (zgx_event_t *) *events;
+
+        if (ev == NULL) {
+            return;
+        }
+
+        zgx_locked_outqueue(ev);
+
+        ev->handler(ev);
+    }
 }
 
