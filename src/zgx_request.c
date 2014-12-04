@@ -97,6 +97,7 @@ static inline int zgx_http_parse_request_line(zgx_request_t *r, zgx_buff_t *b)
                     p++;
                 }
 
+                r->method_end = method_end;
                 switch (method_end - method_start) {
                     case 3:
 
@@ -207,9 +208,60 @@ void zgx_close_request(zgx_request_t *r, int rc)
 
 static void  zgx_http_process_request_headers(zgx_event_t *rev)
 {
-    
+    zgx_connection_t    *c;
+    zgx_request_t       *r;
+    zgx_table_elt_t     *h;
+
+    size_t              size,n;
+    int     rc;
+
+    c = rev->data;
+    r = c->data;
+
+    rc = ZGX_AGAIN;
+    size= CLIENT_HEADER_BUFFER_SIZE;
+
+    for ( ;; ) {
+        if (rc == ZGX_AGAIN) {
+            if (r->header_in->post == r->header_in->end) {
+                r->header_in = zgx_alloc(2*size);
+            }
+
+            n = zgx_http_read_request_header(r);
+
+            if (n == ZGX_AGAIN || n == ZGX_ERROR) {
+                return;
+            }
+
+        }
+
+        rc = zgx_http_parse_header_line(r, r->header_in);
+
+        if (rc == ZGX_OK) {
+            r->request_length += r->header_in->pos - r->header_name_start;
+            h = zgx_list_push(&r->headers_in.headers);
+            if (h == NULL) {
+                zgx_http_close_request(r,ZGX_HTTP_INTERNAL_SERVER_ERRROR);
+                return;
+            }
+
+            h->hash = r->header_hash;
+
+        }
+    }
 }
 
+
+static size_t zgx_read_request_header(zgx_request_t  *r)
+{
+
+}
+
+static int  zgx_http_process_request_uri(zgx_request_t  *r)
+{
+    return ZGX_OK; 
+
+}
 
 static void zgx_http_process_request_line(zgx_event_t *rev)
 {
@@ -255,7 +307,7 @@ static void zgx_http_process_request_line(zgx_event_t *rev)
                 zgx_close_request(r, ZGX_HTTP_INTERNAL_SERVER_ERROR);
                 return;
             }
- 
+
             rev->handler = zgx_http_process_request_headers;
             zgx_http_process_request_headers(rev);
         }
@@ -280,22 +332,21 @@ static void zgx_http_process_request_line(zgx_event_t *rev)
 void zgx_http_wait_request_handler(zgx_event_t  *rev)
 {
     unsigned int        size;
-    zgx_buff_t          *b;
+    zgx_buff_t          *b = NULL;
     zgx_connection_t    *c;
     size_t              n;
 
     c = rev->data;
 
     size = CLIENT_HEADER_BUFFER_SIZE;
-    
-    b = c->buffer;
+
     if (b == NULL) {
         b = zgx_calloc(sizeof(zgx_buff_t));
         if (b == NULL) {
             zgx_close_accepted_connection(c);
             return;
         }
-    }else if (b->start == NULL) {
+
         b->start = zgx_calloc(size);
         if (b->start == NULL) {
             zgx_close_accepted_connection(c);
@@ -307,6 +358,8 @@ void zgx_http_wait_request_handler(zgx_event_t  *rev)
         b->end = b->last + size;
         c->state = WAIT_REQUEST;
     }
+
+    c->buffer = b;
 
     n = read(c->fd, b->last, size);
     if (n == ZGX_AGAIN){
