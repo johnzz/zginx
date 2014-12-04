@@ -38,6 +38,7 @@ int init_listening_socket(zgx_listening_t *l)
 {
 	int		rc;
     int     flags;
+    int     i = 1;
 
 	l = zgx_alloc(sizeof(zgx_listening_t));
 	if (!l) {
@@ -50,13 +51,13 @@ int init_listening_socket(zgx_listening_t *l)
 		zgx_log(ERROR,"socket() error!");
 		return -1;
 	}
-
+/*
 	if (fcntl(l->fd, F_SETFL, O_NONBLOCK) < 0 ){
 		perror("fcntl error!");
 		close(l->fd);
 		return -1;
 	}
-
+*/
     bzero(&l->sa_in,sizeof(l->sa_in));
 
 	l->sa_in.sin_family = AF_INET;
@@ -68,7 +69,7 @@ int init_listening_socket(zgx_listening_t *l)
 		return -1;
 	}
 
-	//setsockopt(l.fd, SOL_SOCKET, SO_REUSEADDR,const void *optval, socklen_t optlen);
+	//setsockopt(l->fd, SOL_SOCKET, SO_REUSEADDR, (void *)&i, sizeof(i));
 
 	if (bind(l->fd, (struct sockaddr *)&(l->sa_in), sizeof(l->sa_in)) < 0) {
 		zgx_log(ERROR,"bind fd:%d error!",l->fd);

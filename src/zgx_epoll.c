@@ -4,7 +4,7 @@
 #define	ZGX_BUFFER_SIZE	1024
 
 #define ZGX_POST_EVENTS 1
-#define zgx_nonblocking(s)  fcntl(s, F_SETFL, fcntl(s, F_GETFL) | O_NONBLOCK)
+#define zgx_nonblocking(s)  fcntl(s, F_SETFL, fcntl(s, F_GETFL, 0) | O_NONBLOCK)
 
 int		use_accept_mutex = 1;
 int		accept_mutex_held;
@@ -14,12 +14,13 @@ static struct epoll_event		*event_list;
 static unsigned long	g_events;
 
 zgx_connection_t * zgx_get_connection(zgx_process_cycle_t *process_cycle, int fd); 
-void zgx_close_accepted_connection(zgx_connection_t *c);
+static int zgx_close_accepted_connection(zgx_connection_t *c);
 static int zgx_epoll_add_conn(zgx_connection_t *c);
 void zgx_epoll_process_events(zgx_process_cycle_t *process_cycle,
                                                       int timeout, int flags);
 
 void zgx_event_process_posted(zgx_process_cycle_t *pc, volatile zgx_event_t  * * events);
+void zgx_free_connection(zgx_connection_t   *c);
 
 static void zgx_locked_inqueue(zgx_event_t **queue, zgx_event_t *ev)
 {
@@ -78,6 +79,9 @@ void zgx_accept_event(zgx_event_t *ev)
 	}
 
     zgx_nonblocking(cfd);
+    int i = 1;
+//  setsockopt(cfd, IPPROTO_TCP, , (void *)&i, sizeof(i));
+
 	c = zgx_get_connection(&process_cycle, cfd);
 	if (!c) {
 		zgx_log(ERROR,"zgx_get_connection failed!");
@@ -101,30 +105,85 @@ void zgx_accept_event(zgx_event_t *ev)
 static void zgx_read_request_handler(zgx_event_t *e)
 {
     zgx_connection_t        *c;
+    size_t                  ret;
     char    buff[1024];
-    
-    zgx_log(DEBUG,"i 'm read request handler!'");
+
+    //zgx_log(DEBUG,"i 'm read request handler!'");
     c = e->data;
     c = (zgx_connection_t *)((unsigned int)c & (unsigned int)~1);
-    sprintf(buff,"i'm a test !");
-    write(c->fd, buff, strlen(buff));
-    close(c->fd);
+
+    for ( ;; ) {
+        ret = zgx_read_request(c->fd, buff, sizeof(buff));
+        if ( ret < 0 &&( errno == EINTR || errno == EAGAIN )) {
+            zgx_log(ERROR,"read %d,errno %d  %s fd:%d",ret,errno,strerror(errno),c->fd);
+            break;
+        }
+
+        if ( ret <= 0) {
+            zgx_log(ERROR,"read %d error",ret);
+            break;
+        }
+
+    }
+
+    write(c->fd, buff, sizeof(buff));
+    zgx_close_accepted_connection(c);
     return;
 }
 
 static void zgx_request_handler(zgx_event_t *e) 
 {
+    zgx_connection_t        *c;
+    char    buff[1024];
 
+    zgx_log(DEBUG,"i 'm read write handler!'");
+
+    c = e->data;
+    c = (zgx_connection_t *)((unsigned int)c & (unsigned int)~1);
+    sprintf(buff,"i'm a test !\n");
+    write(c->fd, buff, strlen(buff));
 }
 
-void zgx_close_accepted_connection(zgx_connection_t *c)
+static int zgx_close_accepted_connection(zgx_connection_t *c)
 {
+    struct epoll_event  ee;
+    int                 op;
 
+    if (c->fd == -1) {
+        zgx_log(ERROR,"connection fd:%d has been closed!",c->fd);
+        return;
+    }
+    op = EPOLL_CTL_DEL;
+    ee.events = 0;
+    ee.data.ptr = NULL;
+
+    if (epoll_ctl(process_cycle.epfd,op,c->fd,&ee) == -1) {
+        zgx_log(ERROR,"epoll_ctl connection:fd:%d failed.",c->fd);
+        return ZGX_ERROR;
+    }
+
+    c->read->active = 0;
+    c->write->active = 0;
+    close(c->fd);
+    c->fd = (int)-1;
+
+    zgx_free_connection(c);
+    return ZGX_OK;
+}
+
+void zgx_free_connection(zgx_connection_t   *c)
+{
+    c->data = process_cycle.free_connections;
+    process_cycle.free_connections = c;
+
+    process_cycle.free_connection_n++;
+
+    return;
 }
 
 void zgx_drain_connections()
 {
-
+    zgx_log(DEBUG,"Need to drain connections!");
 }
 
 zgx_connection_t * zgx_get_connection(zgx_process_cycle_t *process_cycle, int fd)
@@ -170,6 +229,7 @@ zgx_connection_t * zgx_get_connection(zgx_process_cycle_t *process_cycle, int fd
 
 	wev->write = 1;
 
+    zgx_log(DEBUG,"Get a connection:%p",c);
 	return c;
 	
 }
@@ -258,7 +318,7 @@ void zgx_process_event_init(zgx_process_cycle_t *process_cycle)
 	cycle.ls->connection = c;
 	cycle.ls->handler = zgx_set_ls_handler;
 	c->read->handler = zgx_accept_event;
-	
+
 	g_events = conf.events;
 	event_list = zgx_alloc(g_events*sizeof(struct epoll_event));
 	if (!event_list) {
@@ -366,6 +426,7 @@ static int zgx_epoll_add_conn(zgx_connection_t *c)
 
 	return ZGX_OK;
 }
+
 static int zgx_epoll_del_event(zgx_event_t *ev, int event, int flags)
 {
 	struct epoll_event		ee;
@@ -560,3 +621,12 @@ void zgx_event_process_posted(zgx_process_cycle_t *pc, volatile zgx_event_t **ev
     }
 }
 
+int zgx_handle_read_event(zgx_event_t *ev, int flag)
+{
+    //if (!ev->active && !ev->ready) {
+        if (zgx_epoll_add_event(ev, ZGX_READ_EVENT, EPOLLET) == ZGX_ERROR) {
+            return ZGX_ERROR;
+        }
+    //}
+    return ZGX_OK;
+}

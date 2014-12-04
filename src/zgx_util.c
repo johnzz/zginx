@@ -31,3 +31,18 @@ void * zgx_calloc(int size)
 	return NULL;
 }
 
+int zgx_list_init(zgx_list_t *list, unsigned int n, size_t  size)
+{
+    list->part.elts = zgx_calloc(n*size);
+    if (list->part.elts == NULL ){
+        return ZGX_ERROR;
+    }
+
+    list->part.nelts = 0;
+    list->part.next = NULL;
+    list->last = &list->part;
+    list->size = size;
+    list->nalloc = n;
+
+    return ZGX_OK;
+}
