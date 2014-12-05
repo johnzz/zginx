@@ -228,11 +228,13 @@ typedef struct zgx_request_s {
     zgx_buff_t      *header_in;
     unsigned int    method;
     unsigned int    http_version;
+    unsigned int    header_hash;
     zgx_str_t       request_line;
     zgx_str_t       uri;
     zgx_str_t       args;
     zgx_str_t       method_name;
     zgx_str_t       http_protocol;
+    zgx_str_t       content_length;
 
     zgx_http_headers_in_t       headers_in;
     zgx_http_headers_out_t      headers_out;
@@ -273,6 +275,10 @@ typedef struct zgx_request_s {
     u_char                           *port_start;
     u_char                           *port_end;
 
+    u_char                           *header_name_start;
+    u_char                           *header_name_end;
+    u_char                           *header_start;
+    u_char                           *header_end;
 }zgx_request_t;
 
 typedef enum {

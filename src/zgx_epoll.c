@@ -366,7 +366,7 @@ void zgx_process_events(zgx_process_cycle_t *process_cycle)
 	}
 }
 
-static int zgx_epoll_add_event(zgx_event_t *ev,  int event,int flags)
+int zgx_epoll_add_event(zgx_event_t *ev,  int event,int flags)
 {
 	zgx_event_t		*e;
 	zgx_connection_t	*c;
@@ -390,7 +390,6 @@ static int zgx_epoll_add_event(zgx_event_t *ev,  int event,int flags)
         zgx_log(ERROR,"i'm mod:%d",process_cycle.epfd);
 	} else {
 		op = EPOLL_CTL_ADD;
-
 	}
 
 	ee.events = events | flags;

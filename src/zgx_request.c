@@ -3,6 +3,15 @@
 #define CLIENT_HEADER_BUFFER_SIZE   2048
 #define ZGX_HTTP_MODULE 0x50545448
 
+static u_char  lowcase[] =
+        "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+        "\0\0\0\0\0\0\0\0\0\0\0\0\0-\0\0" "0123456789\0\0\0\0\0\0"
+        "\0abcdefghijklmnopqrstuvwxyz\0\0\0\0\0"
+        "\0abcdefghijklmnopqrstuvwxyz\0\0\0\0\0"
+        "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+        "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+        "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+        "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
 void zgx_http_block_reading(zgx_request_t *r)
 {
@@ -49,10 +58,17 @@ zgx_request_t *zgx_create_request(zgx_connection_t *c)
 
 }
 
+static inline int zgx_http_send_response(zgx_request_t *r) {
+
+}
+
+static int zgx_http_send_body(zgx_request_t *r)
+{
+
+}
 
 static inline int zgx_http_parse_request_line(zgx_request_t *r, zgx_buff_t *b)
 {
-    int         state;
     u_char      ch, *p;
     u_char      *method_end, *method_start;
 
@@ -62,7 +78,7 @@ static inline int zgx_http_parse_request_line(zgx_request_t *r, zgx_buff_t *b)
         sw_uri_start,
         sw_http_protocol_start,
         sw_almost_done,
-    }stat;
+    }state;
 
     state =  r->state;
 
@@ -81,7 +97,7 @@ static inline int zgx_http_parse_request_line(zgx_request_t *r, zgx_buff_t *b)
                     return ZGX_HTTP_PARSE_INVALID_METHOD;
                 }
 
-                while (ch == ' ' || ch == '_') {
+                while ((ch == ' ' || ch == '_') && p < b->last) {
                     p++;
                 }
 
@@ -92,7 +108,7 @@ static inline int zgx_http_parse_request_line(zgx_request_t *r, zgx_buff_t *b)
                 method_end = p;
                 method_start = p;
 
-                while (ch != ' ') {
+                while (ch != ' ' && p < b->last) {
                     method_end ++;
                     p++;
                 }
@@ -139,7 +155,7 @@ static inline int zgx_http_parse_request_line(zgx_request_t *r, zgx_buff_t *b)
                 if (ch == '/') {
                     r->uri_start = p;
 
-                    while (ch != ' ') {
+                    while (ch != ' ' && p < b->last) {
                         p++;
                     }
 
@@ -161,13 +177,13 @@ static inline int zgx_http_parse_request_line(zgx_request_t *r, zgx_buff_t *b)
                         return ZGX_HTTP_INVALID_PROTOCOL;
                     }
 
-                    while (ch != CR) {
+                    while (ch != CR && p < b->last) {
                         p++;
                     }
 
                 }
 
-                if (ch == CR) {
+                if (ch == CR && p < b->last) {
                     state = sw_almost_done;
                     p++;
                     break;
@@ -206,6 +222,197 @@ void zgx_close_request(zgx_request_t *r, int rc)
  
 }
 
+int zgx_handle_read_event(zgx_event_t *ev, int flag)
+{
+
+    if (zgx_epoll_add_event(ev, ZGX_READ_EVENT, flag) == ZGX_ERROR) {
+        return ZGX_ERROR;
+    }
+
+    return ZGX_OK;
+}
+
+
+static int zgx_http_read_request_header(zgx_request_t   *r)
+{
+    zgx_connection_t        *c;
+    zgx_event_t             *rev;
+    size_t                  n;
+
+    c = r->connection;
+    rev = c->read;
+
+    n = r->header_in->last - r->header_in->pos;
+
+    if (n > 0) {
+        return n;
+    }
+
+    if (rev->ready) {
+        n = read(c->fd, r->header_in->last, r->header_in->end - r->header_in->last);
+    } else {
+        n = ZGX_AGAIN;
+    }
+
+    if (n == ZGX_AGAIN) {
+        if (zgx_handle_read_event(rev, 0) != ZGX_OK) {
+            zgx_http_close_request(r, ZGX_HTTP_INTERNAL_SERVER_ERROR);
+            return ZGX_ERROR;
+       }
+
+        return ZGX_AGAIN;
+
+    }
+
+    if (n == 0) {
+        zgx_log(ERROR,"client may close the connection!");
+    }
+
+    r->header_in->last += n;
+
+    return n;
+}
+
+static int zgx_http_parse_header_line(zgx_request_t *r,zgx_buff_t *b)
+{
+    enum {
+        sw_start = 0,
+        sw_name,
+        sw_value,
+        sw_almost_done,
+        sw_header_almost_done,
+    }state;
+
+    u_char          ch,*p;
+
+
+    state = r->state;
+
+    for (p = b->pos; p < b->last; p++) {
+        ch = *p;
+
+        switch (ch) {
+
+            case sw_start:
+                r->header_name_start = p;
+
+                break;
+
+                switch(ch) {
+                    case CR:
+                        r->header_end = p;
+                        state = sw_header_almost_done;
+                        break;
+
+                    case LF:
+                        r->header_end = p;
+                        goto header_done;
+
+                    default:
+                        state = sw_name;
+                        break;
+                }
+
+                break;
+
+            case sw_name:
+                r->header_name_start = p;
+                if (ch == ':' ) {
+                    r->header_name_end = p;
+                    state = sw_value;
+                    break;
+                }
+
+                if (ch == CR) {
+                    r->header_name_end = p;
+                    state = sw_almost_done;
+                    break;
+                }
+
+                if (ch == LF) {
+                    r->header_start = p;
+                    r->header_end   = p;
+                    goto done;
+                }
+
+                if (ch == '\0') {
+                    return ZGX_HTTP_PARSE_INVALID_HEADER;
+                }
+
+                break;
+
+            case sw_value:
+
+                if (ch == ' '){
+                    break;
+                }
+
+                if (ch == CR) {
+                    r->header_start = p;
+                    r->header_end = p;
+                    state = sw_almost_done;
+                    break;
+                }
+
+                if (ch == LF) {
+                    r->header_start = p;
+                    r->header_end = p;
+                    goto done;
+                }
+
+                if (ch == '\0') {
+                    return ZGX_HTTP_PARSE_INVALID_HEADER;
+                }
+
+                r->header_start = p;
+                state = sw_almost_done;
+                break;
+
+            case sw_almost_done:
+                if (ch == CR) {
+                    r->header_end = p;
+                    state = sw_header_almost_done;
+                    break;
+                }
+
+                if (ch == LF) {
+                    goto done;
+                }
+
+                return ZGX_HTTP_PARSE_INVALID_HEADER;
+
+            case sw_header_almost_done:
+                if (ch == LF) {
+                    goto header_done;
+                }
+
+                return ZGX_HTTP_PARSE_INVALID_HEADER;
+        }
+    }
+
+    b->pos = p;
+    r->state = state;
+    
+    return ZGX_AGAIN;
+done:
+    b->pos = p + 1;
+    r->state = sw_start;
+
+    return ZGX_OK;
+
+header_done:
+
+    b->pos = p + 1;
+    r->state = sw_start;
+
+    return ZGX_HTTP_PARSE_HEADER_DONE;
+}
+
+zgx_table_elt_t * zgx_list_push(zgx_list_t *headers)
+{
+
+}
+
 static void  zgx_http_process_request_headers(zgx_event_t *rev)
 {
     zgx_connection_t    *c;
@@ -223,7 +430,7 @@ static void  zgx_http_process_request_headers(zgx_event_t *rev)
 
     for ( ;; ) {
         if (rc == ZGX_AGAIN) {
-            if (r->header_in->post == r->header_in->end) {
+            if (r->header_in->pos == r->header_in->end) {
                 r->header_in = zgx_alloc(2*size);
             }
 
@@ -241,31 +448,57 @@ static void  zgx_http_process_request_headers(zgx_event_t *rev)
             r->request_length += r->header_in->pos - r->header_name_start;
             h = zgx_list_push(&r->headers_in.headers);
             if (h == NULL) {
-                zgx_http_close_request(r,ZGX_HTTP_INTERNAL_SERVER_ERRROR);
+                zgx_http_close_request(r,ZGX_HTTP_INTERNAL_SERVER_ERROR);
                 return;
             }
 
             h->hash = r->header_hash;
+            h->key.len = r->header_name_end - r->header_name_start;
+            h->key.data = r->header_name_start;
+            h->key.data[h->key.len] = '\0';
+
+            h->value.len = r->header_end - r->header_start;
+            h->value.data = r->header_start;
+            h->value.data[h->value.len] = '\0';
 
         }
+
+        if (rc == ZGX_HTTP_PARSE_HEADER_DONE) {
+            r->request_length += r->header_in->pos - r->header_name_start;
+
+            r->http_state = ZGX_HTTP_PROCESS_REQUEST_STATE;
+
+            rc = zgx_http_process_request_header(r);
+
+            if (rc != ZGX_OK) {
+                return;
+            }
+
+            zgx_http_process_request(r);
+
+            return;
+        }
+
+        if (rc == ZGX_AGAIN) {
+            zgx_log(DEBUG,"rc == ZGX_AGAIN in zgx_http_process_request_headers");
+            continue;
+        }
+
+        zgx_http_finalize_request(r,ZGX_HTTP_BAD_REQUEST);
+        return;
     }
 }
 
 
-static size_t zgx_read_request_header(zgx_request_t  *r)
-{
-
-}
-
 static int  zgx_http_process_request_uri(zgx_request_t  *r)
 {
-    return ZGX_OK; 
+    return ZGX_OK;
 
 }
 
 static void zgx_http_process_request_line(zgx_event_t *rev)
 {
-    int                 rc,n;
+    int                 rc,n,rv;
     zgx_connection_t    *c;
     zgx_request_t       *r;
     zgx_str_t           host;
@@ -277,7 +510,7 @@ static void zgx_http_process_request_line(zgx_event_t *rev)
 
     for ( ;; ) {
         if (rc == ZGX_AGAIN) {
-            n = zgx_read_request_header(r);
+            n = zgx_http_read_request_header(r);
 
             if (n == ZGX_AGAIN || n == ZGX_ERROR) {
                 return;
