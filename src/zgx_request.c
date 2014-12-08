@@ -219,7 +219,7 @@ done:
 
 void zgx_close_request(zgx_request_t *r, int rc)
 {
- 
+    return; 
 }
 
 int zgx_handle_read_event(zgx_event_t *ev, int flag)
