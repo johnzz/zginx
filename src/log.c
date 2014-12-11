@@ -35,7 +35,7 @@ void zgx_localtime(time_t sec, struct tm *tm)
     tm->tm_year += 1900;
 }
 
-static inline ssize_t	zgx_write(const char *buff,size_t n)
+static inline ssize_t	zgx_log_write(const char *buff,size_t n)
 {
 	return write(cycle.file->fd,buff,n);
 }
@@ -79,7 +79,7 @@ void zgx_log(int log_level, const char *fmt, ...)
 		va_end(args);
 
         text[ret_len+len] = '\n';
-		n = zgx_write(text,ret_len+len+1);
+		n = zgx_log_write(text,ret_len+len+1);
 
 	}
 }

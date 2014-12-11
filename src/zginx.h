@@ -35,6 +35,16 @@
 #define ZGX_HTTP_UNKNOWN        0x0001
 #define ZGX_HTTP_VERSION_10     1000
 
+static void dd(const char *fmt, ...) 
+{	
+	#ifdef DEBUG_MODE
+	
+	zgx_log(DEBUG,fmt,...);
+	#endif
+
+}
+
+
 sig_atomic_t zgx_terminate;
 
 typedef volatile unsigned int zgx_atomic_t ;
@@ -146,37 +156,24 @@ typedef struct {
 }zgx_list_t;
 
 typedef struct {
-    zgx_list_t                        headers;
-
+    zgx_buff_t						  *buff;
     zgx_uint_t                        status;
     zgx_str_t                         status_line;
-
-    zgx_table_elt_t                  *server;
-    zgx_table_elt_t                  *date;
-    zgx_table_elt_t                  *content_length;
-    zgx_table_elt_t                  *content_encoding;
-    zgx_table_elt_t                  *location;
-    zgx_table_elt_t                  *refresh;
-    zgx_table_elt_t                  *last_modified;
-    zgx_table_elt_t                  *content_range;
-    zgx_table_elt_t                  *accept_ranges;
-    zgx_table_elt_t                  *www_authenticate;
-    zgx_table_elt_t                  *expires;
-    zgx_table_elt_t                  *etag;
-
-    zgx_str_t                        *override_charset;
+	zgx_str_t						  server;
+	zgx_str_t						  date;
+	zgx_str_t						  cache_control;
+    zgx_str_t                         content_type;
+	zgx_str_t						  Connection;
 
     size_t                            content_type_len;
-    zgx_str_t                         content_type;
+
     zgx_str_t                         charset;
     u_char                           *content_type_lowcase;
-    zgx_uint_t                        content_type_hash;
-
-    zgx_array_t                       cache_control;
 
     off_t                             content_length_n;
     time_t                            date_time;
     time_t                            last_modified_time;
+	unsigned						  response_ok:1;
 } zgx_http_headers_out_t;
 
 typedef enum {
@@ -223,18 +220,16 @@ typedef struct zgx_request_s {
     zgx_http_event_handler_pt   write_event_handler;
 
     zgx_buff_t		*request;
-	zgx_buff_t		*uri;
 	zgx_buff_t		*orig_uri;
     zgx_buff_t      *header_in;
+	zgx_buff_t		*header_out;
     unsigned int    method;
     unsigned int    http_version;
     unsigned int    header_hash;
     zgx_str_t       request_line;
     zgx_str_t       uri;
-    zgx_str_t       args;
     zgx_str_t       method_name;
     zgx_str_t       http_protocol;
-    zgx_str_t       content_length;
 
     zgx_http_headers_in_t       headers_in;
     zgx_http_headers_out_t      headers_out;

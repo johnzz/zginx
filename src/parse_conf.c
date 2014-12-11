@@ -131,7 +131,7 @@ int parse_conf(char *conf_file)
 				fprintf(stderr,"Can't set [log path] config item!\n");
 				return -1;
 			}
-			fprintf(stdout,"log:%s\n",conf.log);
+			fprintf(stdout,"log:%stest\n",conf.log);
 		}
 
 		if (!strncmp("llevel",start,((int)end-(int)start)/sizeof(char))) {

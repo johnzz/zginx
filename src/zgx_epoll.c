@@ -1,4 +1,5 @@
 #include "zgx_epoll.h"
+#include "zginx.h"
 
 #define ZGX_SOCKADDRLEN 512 
 #define	ZGX_BUFFER_SIZE	1024
@@ -181,6 +182,15 @@ void zgx_free_connection(zgx_connection_t   *c)
     return;
 }
 
+void zgx_reusable_connection(zgx_connection_t *c, int flag)
+{
+	//TODO
+	if(c->reusable) {
+		
+	}
+	c->reusable = flag;
+}
+
 void zgx_drain_connections()
 {
     zgx_log(DEBUG,"Need to drain connections!");
@@ -237,8 +247,8 @@ zgx_connection_t * zgx_get_connection(zgx_process_cycle_t *process_cycle, int fd
 static void zgx_set_ls_handler(zgx_connection_t *e)
 {
 	if (e) {
-		e->read->handler = zgx_read_request_handler;
-		e->write->handler = zgx_request_handler;
+		e->read->handler = zgx_http_wait_request_handler;
+		e->write->handler = zgx_http_empty_handler;
 		return;
 	}
 
@@ -622,10 +632,22 @@ void zgx_event_process_posted(zgx_process_cycle_t *pc, volatile zgx_event_t **ev
 
 int zgx_handle_read_event(zgx_event_t *ev, int flag)
 {
-    //if (!ev->active && !ev->ready) {
+    if (!ev->active ) {
         if (zgx_epoll_add_event(ev, ZGX_READ_EVENT, EPOLLET) == ZGX_ERROR) {
             return ZGX_ERROR;
         }
-    //}
+    }
+	
     return ZGX_OK;
+}
+
+int zgx_handle_write_event(zgx_event_t *ev, int flag)
+{
+	if (!ev->active) {
+		if (zgx_epoll_add_event(ev, ZGX_WRITE_EVENT, EPOLLET) == ZGX_ERROR) {
+			return ZGX_ERROR;
+		}
+	}
+
+	return ZGX_OK;
 }
