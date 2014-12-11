@@ -52,7 +52,7 @@ void zgx_log(int log_level, const char *fmt, ...)
 	time_t		sec;
 	struct timeval tv;
 
-	len = sizeof("1970/01/01 01:01:01 [DEBUG] ");
+	len = strlen("1970/01/01 01:01:01 [DEBUG] ");
 	if (log_level >= conf.llevel) {
 		va_start(args, fmt);
 		switch (log_level) {
@@ -84,3 +84,10 @@ void zgx_log(int log_level, const char *fmt, ...)
 	}
 }
 
+void dd(const char *fmt, ...)
+{
+	#ifdef DEBUG_MODE
+	zgx_log(DEBUG,fmt);
+	#endif
+
+}

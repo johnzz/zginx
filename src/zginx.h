@@ -1,4 +1,7 @@
 //#include <sys/net.h>
+#ifndef __ZGINX_H__
+#define __ZGINX_H__
+
 #define _GNU_SOURCE
 #include <sched.h>
 #include <sys/stat.h>
@@ -35,14 +38,6 @@
 #define ZGX_HTTP_UNKNOWN        0x0001
 #define ZGX_HTTP_VERSION_10     1000
 
-static void dd(const char *fmt, ...) 
-{	
-	#ifdef DEBUG_MODE
-	
-	zgx_log(DEBUG,fmt,...);
-	#endif
-
-}
 
 
 sig_atomic_t zgx_terminate;
@@ -142,11 +137,12 @@ typedef struct {
     u_char          *lowcase_key;
 }zgx_table_elt_t;
 
-typedef struct {
+typedef struct zgx_list_part_s zgx_list_part_t;
+struct zgx_list_part_s{
     void            *elts;
     unsigned int    nelts;
     zgx_list_part_t *next;
-}zgx_list_part_t;
+};
 
 typedef struct {
     zgx_list_part_t     *last;
@@ -157,7 +153,7 @@ typedef struct {
 
 typedef struct {
     zgx_buff_t						  *buff;
-    zgx_uint_t                        status;
+    int                               status;
     zgx_str_t                         status_line;
 	zgx_str_t						  server;
 	zgx_str_t						  date;
@@ -210,8 +206,9 @@ typedef struct {
 
 }zgx_http_headers_in_t;
 
-typedef void(*zgx_http_event_handler_pt)(zgx_request_t *r);
 
+typedef struct zgx_request_s zgx_request_t;
+typedef void(*zgx_http_event_handler_pt)(zgx_request_t *r);
 typedef struct zgx_request_s {
 	zgx_connection_t        *connection;
     unsigned int            signature;
@@ -234,9 +231,7 @@ typedef struct zgx_request_s {
     zgx_http_headers_in_t       headers_in;
     zgx_http_headers_out_t      headers_out;
 	zgx_method_t	http_method;
-	zgx_version_t	http_version;
 
-	zgx_buff_t		*request_line;
 	zgx_buff_t		*http_host;
     
     off_t                             request_length;
@@ -385,3 +380,6 @@ extern configure_t      conf;
 extern zgx_shmtx_t      zgx_shmtx;
 void * zgx_calloc(int size);
 void * zgx_alloc(int size);
+
+
+#endif

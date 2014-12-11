@@ -1,5 +1,5 @@
 #include "zgx_epoll.h"
-#include "zginx.h"
+#include "zgx_request.h"
 
 #define ZGX_SOCKADDRLEN 512 
 #define	ZGX_BUFFER_SIZE	1024
@@ -15,7 +15,7 @@ static struct epoll_event		*event_list;
 static unsigned long	g_events;
 
 zgx_connection_t * zgx_get_connection(zgx_process_cycle_t *process_cycle, int fd); 
-static int zgx_close_accepted_connection(zgx_connection_t *c);
+int zgx_close_accepted_connection(zgx_connection_t *c);
 static int zgx_epoll_add_conn(zgx_connection_t *c);
 void zgx_epoll_process_events(zgx_process_cycle_t *process_cycle,
                                                       int timeout, int flags);
@@ -97,12 +97,13 @@ void zgx_accept_event(zgx_event_t *ev)
 	wev = c->write;
 	rev->read = 1;
 
+    dd("****IN zgx_accept_event");
 	l->handler(c);
 	if (zgx_epoll_add_conn(c) == ZGX_ERROR) {
 		zgx_close_accepted_connection(c);
 	}
 }
-
+/*
 static void zgx_read_request_handler(zgx_event_t *e)
 {
     zgx_connection_t        *c;
@@ -131,7 +132,7 @@ static void zgx_read_request_handler(zgx_event_t *e)
     zgx_close_accepted_connection(c);
     return;
 }
-
+*/
 static void zgx_request_handler(zgx_event_t *e) 
 {
     zgx_connection_t        *c;
@@ -145,7 +146,7 @@ static void zgx_request_handler(zgx_event_t *e)
     write(c->fd, buff, strlen(buff));
 }
 
-static int zgx_close_accepted_connection(zgx_connection_t *c)
+int zgx_close_accepted_connection(zgx_connection_t *c)
 {
     struct epoll_event  ee;
     int                 op;
@@ -246,7 +247,10 @@ zgx_connection_t * zgx_get_connection(zgx_process_cycle_t *process_cycle, int fd
 
 static void zgx_set_ls_handler(zgx_connection_t *e)
 {
+    
 	if (e) {
+
+        dd("***zgx_set_ls_handler");
 		e->read->handler = zgx_http_wait_request_handler;
 		e->write->handler = zgx_http_empty_handler;
 		return;
@@ -436,7 +440,7 @@ static int zgx_epoll_add_conn(zgx_connection_t *c)
 	return ZGX_OK;
 }
 
-static int zgx_epoll_del_event(zgx_event_t *ev, int event, int flags)
+int zgx_epoll_del_event(zgx_event_t *ev, int event, int flags)
 {
 	struct epoll_event		ee;
 	zgx_connection_t		*c;
@@ -625,6 +629,8 @@ void zgx_event_process_posted(zgx_process_cycle_t *pc, volatile zgx_event_t **ev
         }
 
         zgx_locked_outqueue(ev);
+
+        zgx_log(DEBUG,"***IN zgx_event_process_posted");
 
         ev->handler(ev);
     }

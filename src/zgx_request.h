@@ -1,5 +1,6 @@
 #ifndef __ZGX_REQUEST_H__
 #define __ZGX_REQUEST_H__
+#include "zginx.h"
 
 #define CR      (u_char)'\r'
 #define LF      (u_char)'\n'
@@ -39,7 +40,7 @@ void zgx_http_block_reading(zgx_request_t *r);
 int zgx_read_request_line(zgx_connection_t *c);
 static int zgx_http_read_request_header(zgx_request_t   *r);
 static int zgx_http_parse_header_line(zgx_request_t *r,zgx_buff_t *b);
-static int zgx_http_core_write_hanlder(zgx_request_t *r);
+void zgx_http_core_write_hanlder(zgx_request_t *r);
 
 void zgx_http_core_run_phases(zgx_request_t *r);
 static void zgx_http_request_handler(zgx_event_t *ev);
@@ -59,8 +60,8 @@ static int zgx_http_send_body(zgx_request_t *r);
 int zgx_read_request_header(zgx_connection_t *c);
 
 int zgx_parase_request_header(zgx_request_t *r);
-void zgx_http_wait_request_handler(zgx_event_t  *rev);
-void zgx_http_empty_handler(zgx_event_t	*rev);
+extern void zgx_http_wait_request_handler(zgx_event_t  *rev);
+extern void zgx_http_empty_handler(zgx_event_t	*rev);
 zgx_request_t *zgx_create_request(zgx_connection_t *c);
 void zgx_http_close_connection(zgx_connection_t *c);
 
@@ -69,6 +70,6 @@ void zgx_close_connection(zgx_connection_t *c);
 void zgx_http_close_request(zgx_request_t   *r, int flag);
 void zgx_http_finalize_request(zgx_request_t *r, int flag);
 
-
+static ssize_t zgx_write(int fd, u_char *buff, ssize_t size);
 
 #endif
